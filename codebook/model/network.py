@@ -204,5 +204,5 @@ def squared_emd_loss(logits, labels, num_classes=-1, mask=None):
         torch.tensor: Squared EMD loss
     """
     y_pred = torch.softmax(logits, dim=-1)
-    y_true = F.one_hot(labels, num_classes=num_classes).float()
+    y_true = F.one_hot(labels.long(), num_classes=num_classes).float()
     return squared_emd_loss_one_hot_labels(y_pred, y_true, mask=mask)

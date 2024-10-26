@@ -3,8 +3,15 @@ MASK_RATIO_LOW = 0.3
 MASK_RATIO_HIGH = 0.7
 BIT = 6
 REINIT_THRESHOLD = 7
-REINIT_TRAIN_EPOCH = 200
-TOTAL_TRAIN_EPOCH = 250
+REINIT_TRAIN_EPOCH = 400
+TOTAL_TRAIN_EPOCH = 500
+
+# SOLID CONFIG
+RPLAN_TRAIN_PATH = 'train.pkl'
+RPLAN_FULL_PATH = 'data/solid/train.pkl'
+RPLAN_PARAM_SEQ = 4
+MAX_RPLAN = 80
+RPLAN_CODEBOOK_DIM = 5000 # or optionally use 5000
 
 # SOLID CONFIG
 SOLID_TRAIN_PATH = 'data/solid/train_deduplicate.pkl'
@@ -32,14 +39,14 @@ LOOP_CODEBOOK_DIM = 5000
 ENCODER_CONFIG = {
     'hidden_dim': 512,
     'embed_dim': 256,  
-    'num_layers': 4,   
+    'num_layers': 8,   
     'num_heads': 8,
     'dropout_rate': 0.1  
 }
 DECODER_CONFIG = {
     'hidden_dim': 512,
     'embed_dim': 256,  
-    'num_layers': 4,   
+    'num_layers': 8,   
     'num_heads': 8,
     'dropout_rate': 0.1
 }

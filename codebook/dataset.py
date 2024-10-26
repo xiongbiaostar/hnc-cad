@@ -4,7 +4,46 @@ import pickle
 import random
 from config import *
 
+class RPLANValDataset(torch.utils.data.Dataset):
+    def __init__(self, path):
+        print('Loading Data...')
+        
+        with open(path, 'rb') as f:
+            dataset = pickle.load(f)
+        self.param = dataset['param']
+        self.seq_length = dataset['seq_mask']
+        self.mask_length = dataset['ignore_mask']
 
+    def __len__(self):
+        return len(self.param)
+
+    def __getitem__(self, idx):
+        param_sample = torch.tensor(self.param[idx], dtype=torch.int)
+        seq_length_sample = torch.tensor(self.seq_length[idx], dtype=torch.bool)
+        mask_length_sample = torch.tensor(self.mask_length[idx], dtype=torch.bool)
+
+        return param_sample, seq_length_sample, mask_length_sample
+        
+class RPLANDataset(torch.utils.data.Dataset):
+    def __init__(self, path):
+        print('Loading Data...')
+        
+        with open(path, 'rb') as f:
+            dataset = pickle.load(f)
+        self.param = dataset['param']
+        self.seq_length = dataset['seq_mask']
+        self.mask_length = dataset['ignore_mask']
+
+    def __len__(self):
+        return len(self.param)
+
+    def __getitem__(self, idx):
+        param_sample = torch.tensor(self.param[idx], dtype=torch.int)
+        seq_length_sample = torch.tensor(self.seq_length[idx], dtype=torch.bool)
+        mask_length_sample = torch.tensor(self.mask_length[idx], dtype=torch.bool)
+
+        return param_sample, seq_length_sample, mask_length_sample
+        
 class SolidData(torch.utils.data.Dataset):
     """
     Dataset for solid
