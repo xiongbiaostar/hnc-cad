@@ -11,16 +11,16 @@ BBOX_RANGE = 1
 CUBOID_RANGE = 1
 MAX_CAD = 200
 MAX_CODE = 35
-SKETCH_PAD = 5
+SKETCH_PAD = 3
 EXT_PAD = 2
-CODE_PAD = 4
+CODE_PAD = 3
 
 ################
 # Train Config #
 ################
 UNCOND_TRAIN_EPOCH = 350
 COND_TRAIN_EPOCH = 250
-CAD_TRAIN_PATH = 'data/model/train_deduplicate.pkl'
+CAD_TRAIN_PATH = 'data/profile/train.pkl'
 ENCODER_CONFIG = {
     'hidden_dim': 512,
     'embed_dim': 256,  
