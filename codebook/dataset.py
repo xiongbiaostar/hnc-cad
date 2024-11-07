@@ -90,7 +90,7 @@ class ProfileData(torch.utils.data.Dataset):
         # Filter data for training
         self.data = []
         for data in dataset:
-            bboxs = data['profile']
+            bboxs = np.array(data['profile'])
             num_bbox = len(bboxs)
 
             if num_bbox <= MAX_PROFILE:
