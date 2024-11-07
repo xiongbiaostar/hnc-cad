@@ -104,7 +104,9 @@ class ProfileData(torch.utils.data.Dataset):
         # print(f'Post-Filter: {len(self.data)}, Keep Ratio: {100*len(self.data)/len(dataset):.2f}%')
 
     def get_corners(self, boxes):
-        x_min, x_max, y_min, y_max = boxes.T
+        x_min, y_min, x_max, y_max = boxes.T
+        x_min, x_max = np.minimum(x_min, x_max), np.maximum(x_min, x_max)
+        y_min, y_max = np.minimum(y_min, y_max), np.maximum(y_min, y_max)
         x_span, y_span = x_max - x_min, y_max - y_min
         xywh = np.concatenate(
             [x_min[:, np.newaxis], y_min[:, np.newaxis], x_span[:, np.newaxis], y_span[:, np.newaxis]], 1)
