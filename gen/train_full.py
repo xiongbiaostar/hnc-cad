@@ -18,7 +18,7 @@ def train(args):
     device = torch.device("cuda:0")
 
     # Initialize dataset loader
-    dataset = CADData(CAD_TRAIN_PATH, args.solid_code, args.profile_code, args.loop_code, args.mode, is_training=True)
+    dataset = CADData(CAD_TRAIN_PATH, Boundaries_path, args.profile_code, args.loop_code, args.mode, is_training=True)
     code_size = dataset.profile_unique_num + dataset.loop_unique_num
     dataloader = torch.utils.data.DataLoader(dataset,
                                              shuffle=True,
@@ -122,7 +122,6 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=str, help="Output folder to save the data", required=True)
     parser.add_argument("--batchsize", type=int, help="Training batchsize", required=True)
     parser.add_argument("--device", type=str, help="CUDA device", required=True)
-    parser.add_argument("--solid_code", type=str, required=True, help='Extracted solid codes')
     parser.add_argument("--profile_code", type=str, required=True, help='Extracted profile codes')
     parser.add_argument("--loop_code", type=str, required=True, help='Extracted loop codes')
     parser.add_argument("--mode", type=str, required=True, help='uncond | cond')

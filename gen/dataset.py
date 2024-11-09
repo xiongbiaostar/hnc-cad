@@ -9,12 +9,12 @@ import random
 class CADData(torch.utils.data.Dataset):
     """ CAD dataset """
 
-    def __init__(self, room_path, profile_path, loop_path, mode, is_training=True):
+    def __init__(self, room_path, boundary_path, profile_path, loop_path, mode, is_training=True):
         # Load data
         with open(room_path, 'rb') as f:  # profile/train.py
             room_data = pickle.load(f)
 
-        with open(room_path, 'rb') as f:  # loop/train.py
+        with open(boundary_path, 'rb') as f:  # loop/train.py
             boundaries_data = pickle.load(f)
 
         with open(profile_path, 'rb') as f:  # profile.pkl
@@ -32,6 +32,7 @@ class CADData(torch.utils.data.Dataset):
 
         # Find matching codes
         self.data = []
+        boundaries_dict = {item['uid']: item['param'] for item in boundaries_data}
         print("Loading dataset...")
         for room in tqdm(room_data):
             sketchProfileCode = []
@@ -47,12 +48,16 @@ class CADData(torch.utils.data.Dataset):
 
             # LOOP code
             loop_codes = []
-            num_loop = len(room_data['profile'])
+            boundaries = []
+            num_loop = len(room['profile'])
             for idx_loop in range(num_loop):
                 loop_uid = profile_uid + '_' + str(idx_loop)
                 if loop_uid not in self.loop_code:
                     valid = False
                     continue
+                if loop_uid in boundaries_dict:
+                    param = boundaries_dict[loop_uid]
+                    boundaries.append(param)
                 loop_code = self.loop_code[loop_uid]  # Loop code index
                 loop_codes.append(loop_code)
             sketchLoopCode.append(loop_codes)
@@ -61,7 +66,7 @@ class CADData(torch.utils.data.Dataset):
                 continue
 
             # Global cad parameters
-            pixel_full, coord_full = self.param2pix(boundaries_data)
+            pixel_full, coord_full = self.param2pix(boundaries)
 
             # Hierarchical codes (improved)
             total_code = []
@@ -87,7 +92,7 @@ class CADData(torch.utils.data.Dataset):
             vec_data['sketch_mask'] = sketch_mask
             vec_data['code'] = total_code
             vec_data['code_mask'] = code_mask
-            vec_data['param'] = boundaries_data
+            vec_data['param'] = boundaries
 
             self.data.append(vec_data)
 
@@ -95,24 +100,27 @@ class CADData(torch.utils.data.Dataset):
         pixel_full = []
         coord_full = []
 
-        # Sketch
-        coords = []
-        pixels = []
-        for param in boundaries['param']:
-            coords.append([param])
-            coords.append(np.array([-1, -1]))
-        coords.append(np.array([-2, -2]))  # loop结束标志
-        coords.append(np.array([-3, -3]))  # profile结束标志
 
-        for xy in coords:
-            if xy[0] < 0:
-                pixels.append(xy[0])
-            else:
-                pixels.append(xy[1] * (2 ** CAD_BIT) + xy[0])
+        for boundary in boundaries:
+            # Sketch
+            coords = []
+            pixels = []
+            for param in boundary:
+                coords.append(param)
+                coords.append(np.array([-1, -1]))
+            coords.append(np.array([-2, -2]))  # loop结束标志
+
+
+            for xy in coords:
+                if xy[0] < 0:
+                    pixels.append(xy[0])
+                else:
+                    pixels.append(xy[1] * (2 ** CAD_BIT) + xy[0])
 
             pixel_full.append(pixels)
             coord_full.append(coords)
 
+        coord_full.append(np.array([-3, -3]))  # profile结束标志
         pixel_full += [-3]
 
         coord_full = np.vstack(coord_full) + SKETCH_PAD
@@ -124,24 +132,27 @@ class CADData(torch.utils.data.Dataset):
         pixel_full = []
         coord_full = []
 
-        # Sketch
-        coords = []
-        pixels = []
-        for param in boundaries['param']:
-            coords.append([param])
-            coords.append(np.array([-1, -1]))
-        coords.append(np.array([-2, -2]))  # loop结束标志
-        coords.append(np.array([-3, -3]))  # profile结束标志
 
-        for xy in coords:
-            if xy[0] < 0:
-                pixels.append(xy[0])
-            else:
-                pixels.append(xy[1] * (2 ** CAD_BIT) + xy[0])
+        for boundary in boundaries:
+            # Sketch
+            coords = []
+            pixels = []
+            for param in boundary:
+                coords.append(param)
+                coords.append(np.array([-1, -1]))
+            coords.append(np.array([-2, -2]))  # loop结束标志
+
+
+            for xy in coords:
+                if xy[0] < 0:
+                    pixels.append(xy[0])
+                else:
+                    pixels.append(xy[1] * (2 ** CAD_BIT) + xy[0])
 
             pixel_full.append(pixels)
             coord_full.append(coords)
 
+        coord_full.append(np.array([-3, -3]))  # profile结束标志
         pixel_full += [-3]
 
         coord_full = np.vstack(coord_full) + SKETCH_PAD

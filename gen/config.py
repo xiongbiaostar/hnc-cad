@@ -21,6 +21,7 @@ CODE_PAD = 3
 UNCOND_TRAIN_EPOCH = 350
 COND_TRAIN_EPOCH = 250
 CAD_TRAIN_PATH = 'data/profile/train.pkl'
+Boundaries_path = 'data/loop/train.pkl'
 ENCODER_CONFIG = {
     'hidden_dim': 512,
     'embed_dim': 256,  
