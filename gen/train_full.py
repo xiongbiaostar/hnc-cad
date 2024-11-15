@@ -50,7 +50,7 @@ def train(args):
         progress_bar = tqdm(total=len(dataloader))
         progress_bar.set_description(f"Epoch {epoch}")
 
-        for pixel_p, coord_p, sketch_mask_p, pixel, coord, sketch_mask, code, code_mask in dataloader:
+        for pixel_p, coord_p, sketch_mask_p, pixel, coord, sketch_mask, code, code_mask, _ in dataloader:
             pixel_p = pixel_p.to(device)
             coord_p = coord_p.to(device)
             sketch_mask_p = sketch_mask_p.to(device)

@@ -93,6 +93,7 @@ class CADData(torch.utils.data.Dataset):
             vec_data['code'] = total_code
             vec_data['code_mask'] = code_mask
             vec_data['param'] = boundaries
+            vec_data['name'] = profile_uid
 
             self.data.append(vec_data)
 
@@ -141,7 +142,6 @@ class CADData(torch.utils.data.Dataset):
                 coords.append(param)
                 coords.append(np.array([-1, -1]))
             coords.append(np.array([-2, -2]))  # loop结束标志
-
 
             for xy in coords:
                 if xy[0] < 0:
@@ -223,7 +223,7 @@ class CADData(torch.utils.data.Dataset):
             pixels = vec_data['pixel']
             coords = vec_data['coord']
 
-            return pixels, coords, sketch_mask, pixels_aug, coords_aug, code, code_mask
+            return pixels, coords, sketch_mask, pixels_aug, coords_aug, code, code_mask, vec_data['name']
 
         else:  # conditional
             assert self.mode == 'cond'
@@ -248,7 +248,7 @@ class CADData(torch.utils.data.Dataset):
             pixels = vec_data['pixel']
             coords = vec_data['coord']
 
-            return pixels_par, coords_par, sketch_mask_par, pixels, coords, sketch_mask, code, code_mask
+            return pixels_par, coords_par, sketch_mask_par, pixels, coords, sketch_mask, code, code_mask, vec_data['name']
 
 
 class CodeData(torch.utils.data.Dataset):
