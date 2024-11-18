@@ -1,3 +1,5 @@
+
+
 # Hierarchical Neural Coding for Controllable CAD Model Generation (ICML 2023)
 
 [![arXiv](https://img.shields.io/badge/📃-arXiv%20-red.svg)](https://arxiv.org/abs/2307.00149)
@@ -28,91 +30,39 @@ three-level hierarchical tree of neural codes, from global part arrangement down
 
 We also provide the [docker image](https://hub.docker.com/r/samxuxiang/skexgen). Note: only tested on CUDA 11.4. 
 
+## codebook训练
 
-## Dataset 
-We use the dataset from [DeepCAD](https://github.com/ChrisWu1997/DeepCAD) for training and evaluation.
+这部分代码在文件夹codebook下面。分别训练profile和loop的codebook，读取data/loop/train.pkl数据。config.py中对应模型的参数设置。
 
-The sketch-and-extrude sequences need to be first converted to our obj format following the steps from [SkexGen](https://github.com/samxuxiang/SkexGen). 
-
-Run the following script to download our post-processed DeepCAD data in obj format
-
-    python scripts/download.py
-
-
-After the data is downloaded, run this script to get the solid, profile, loop and CAD model data
-
-    sh scripts/process.sh
-
-
-Run the deduplication script, this will output post-filtered data as ```train_deduplicate.pkl```
-
-    sh scripts/deduplicate.sh
-
-Download the ready-to-use [post-deduplicate data](https://drive.google.com/file/d/1U4UuhFzs7BenViVD5tqoQzH72jbE_oKi/view?usp=sharing).
-
-
-
-## Usage
-
-### Codebook 
-Train the three-level codebook with
-
-    sh scripts/codebook.sh
-
-Download our pretrained codebook module from [here](https://drive.google.com/file/d/1UXvF3fsRM1RxxtArxvBu--t0foU_6ZwR/view?usp=sharing). 
-
-After the codebooks are trained, extract the neural codes corresponding to each training data with
-
-    sh scripts/extract_code.sh
-
-Extracted codes from the pretrained model are available [here](https://drive.google.com/file/d/1uoCcwMGFftgouaH4evg0dDKfS3MtgEIR/view?usp=sharing).
-
-
-### Random Generation
-Run the following script to train the code-tree generator and model generator for unconditional generation
-
-    sh scripts/gen_uncond.sh
-
-Download our pretrained unconditional generation module from [here](https://drive.google.com/file/d/142PMsq3i0mXJMnCkcf-o63DBrU0fe6Sj/view?usp=sharing). 
-
-For testing, run this script to generate 1000 CAD samples and visualize the results
-
-    sh scripts/sample_uncond.sh
-
-For evaluation, uncomment the eval script in ```sample_uncond.sh```, this would generate > 10,000 samples. Then compute JSD, MMD, and COV scores using ```eval.sh```. Warning: this step can be very slow.
-
-    sh scripts/eval.sh
-
-Please also download the [test data](https://drive.google.com/file/d/1FhONYaJTK2vkayfDKH5TaHXDyjl2f4f-/view?usp=sharing) and unzip it inside the ```data``` folder. This is required for computing the evaluation metrics.
-
-
-### Conditional Generation
-
-Train the full model including model encoder for conditional CAD generation
-
-    sh scripts/gen_cond.sh
-
-For testing (e.g CAD autocomplete), run this script to generate full CAD model from partial extruded profiles.
-
-    sh scripts/sample_cond.sh
-
-
-
-
-## Acknowledgement
-This research is partially supported by NSERC Discovery Grants with Accelerator Supplements and DND/NSERC Discovery Grant Supplement, NSERC Alliance Grants, and John R. Evans Leaders Fund (JELF).
-
-
-## Citation
-If you find our work useful in your research, please cite the following paper
 ```
-@article{xu2023hierarchical,
-  title={Hierarchical Neural Coding for Controllable CAD Model Generation},
-  author={Xu, Xiang and Jayaraman, Pradeep Kumar and Lambourne, Joseph G and Willis, Karl DD and Furukawa, Yasutaka},
-  journal={arXiv preprint arXiv:2307.00149},
-  year={2023}
-}
+python codebook/train.py --output proj_log/profile --batchsize 256 --format profile --device 0
+python codebook/train.py --output proj_log/loop --batchsize 256 --format loop --device 0
 ```
 
-## Misc 
-- If you encounter the issue of "No loop matching the specified signature", try downgrading numpy to 1.23.
+根据训练好的模型提取出profile.pkl和loop.pkl
+
+```
+python codebook/extract_code.py --checkpoint proj_log/profile --format profile --epoch 250 --device 0
+python codebook/extract_code.py --checkpoint proj_log/loop --format loop --epoch 250 --device 0
+```
+
+
+
+## 预测模型训练
+
+这部分代码在文件夹gen下面，主要函数是cond_train.py和cond_generation.分别进行训练和预测。数据处理在dataset.py中CADData类。config.py中COND_TRAIN_EPOCH设置训练epoch和其他参数。
+
+```
+python gen/cond_train.py --output proj_log/gen_full --batchsize 256 --profile_code  profile.pkl --loop_code loop.pkl --mode cond --device 0
+```
+
+读取训练好模型预测，
+
+```
+python gen/cond_generatino.py --output result/ac_test --weight proj_log/gen_full --profile_code  profile.pkl --loop_code loop.pkl --mode cond --device 0
+```
+
+
+
+
+
