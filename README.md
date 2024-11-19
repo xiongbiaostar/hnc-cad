@@ -30,9 +30,12 @@ three-level hierarchical tree of neural codes, from global part arrangement down
 
 We also provide the [docker image](https://hub.docker.com/r/samxuxiang/skexgen). Note: only tested on CUDA 11.4. 
 
+# 基于双层构架实现内墙预测
+Loop层学习当个层之间的墙的关系，Profile层学习房间之间的关系
+
 ## codebook训练
 
-这部分代码在文件夹codebook下面。分别训练profile和loop的codebook，读取data/loop/train.pkl数据。config.py中对应模型的参数设置。
+分别训练profile和loop的codebook。读取data/loop/train.pkl数据，config.py中对应模型的参数设置。
 
 ```
 python codebook/train.py --output proj_log/profile --batchsize 256 --format profile --device 0
@@ -46,8 +49,6 @@ python codebook/extract_code.py --checkpoint proj_log/profile --format profile -
 python codebook/extract_code.py --checkpoint proj_log/loop --format loop --epoch 250 --device 0
 ```
 
-
-
 ## 预测模型训练
 
 这部分代码在文件夹gen下面，主要函数是cond_train.py和cond_generation.分别进行训练和预测。数据处理在dataset.py中CADData类。config.py中COND_TRAIN_EPOCH设置训练epoch和其他参数。
@@ -56,10 +57,11 @@ python codebook/extract_code.py --checkpoint proj_log/loop --format loop --epoch
 python gen/cond_train.py --output proj_log/gen_full --batchsize 256 --profile_code  profile.pkl --loop_code loop.pkl --mode cond --device 0
 ```
 
+## 模型生成
 读取训练好模型预测，
 
 ```
-python gen/cond_generatino.py --output result/ac_test --weight proj_log/gen_full --profile_code  profile.pkl --loop_code loop.pkl --mode cond --device 0
+python gen/cond_generation.py --output result/ac_test --weight proj_log/gen_full --profile_code  profile.pkl --loop_code loop.pkl --mode cond --device 0
 ```
 
 
