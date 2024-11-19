@@ -12,7 +12,7 @@
             "console": "integratedTerminal",
             "args": [
                 "--output", "proj_log/RPlan2Level/profile",
-                "--batchsize", "512",
+                "--batchsize", "450",
                 "--format", "profile",
                 "--device", "0"
             ]
@@ -21,11 +21,11 @@
             "name": "Python Debugger: Codebook_loop",
             "type": "debugpy",
             "request": "launch",
-            "program": "codebook/train.py",
+            "program": "codebook/train_RPlan_2Lvl.py",
             "console": "integratedTerminal",
             "args": [
                 "--output", "proj_log/RPlan2Level/loop",
-                "--batchsize", "512",
+                "--batchsize", "450",
                 "--format", "loop",
                 "--device", "0"
             ]
