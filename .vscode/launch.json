@@ -1,0 +1,34 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Codebook_profile",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "codebook/train.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--output", "proj_log/RPlan2Level/profile",
+                "--batchsize", "512",
+                "--format", "profile",
+                "--device", "0"
+            ]
+        },
+        {
+            "name": "Python Debugger: Codebook_loop",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "codebook/train.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--output", "proj_log/RPlan2Level/loop",
+                "--batchsize", "512",
+                "--format", "loop",
+                "--device", "0"
+            ]
+        }
+    ]
+}
