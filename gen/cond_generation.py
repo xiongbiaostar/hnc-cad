@@ -66,20 +66,6 @@ def plot(points, save_folder, name):
     plt.savefig(save_path)
     plt.close()
 
-def get_pix(polygon_points):
-    polygon_points = [tuple(point) for point in polygon_points]
-    image = Image.new("1", (64, 64), 0)
-
-    draw = ImageDraw.Draw(image)
-    draw.polygon(polygon_points, fill=1)
-
-    image_np = np.array(image)
-
-    polygon_pixels = np.argwhere(image_np == 1)
-
-    pixel_indices = polygon_pixels[:, 1] + 64 * polygon_pixels[:, 0]
-    return pixel_indices
-
 @torch.inference_mode()
 def sample(args):
     os.environ["CUDA_VISIBLE_DEVICES"] = args.device
@@ -106,24 +92,17 @@ def sample(args):
     # Random sampling
     code_bsz = 1  # every partial input samples this many neural codes
     count = 0
-    for pixel_p, coord_p, sketch_mask_p, _, _, _, _, _ ,name in dataloader:
-        if count > 50: break  # only visualize the first 50 examples
-        coord_p_np = coord_p.squeeze(0).numpy()
+    for pixel_p, coord_p, sketch_mask_p, _, _, _, _, _,name in dataloader:
+        if count > 200: break  # only visualize the first 50 examples
 
         pixel_p = pixel_p.cuda()
         coord_p = coord_p.cuda()
         sketch_mask_p = sketch_mask_p.cuda()
 
-
-        boundary = pix2param(coord_p_np, SKETCH_PAD)
-        pix_all = get_pix(boundary[0])
-
-
         # encode partial CAD model
         latent_sketch = sketch_enc(pixel_p, coord_p, sketch_mask_p)
 
         # generate the neural code tree
-
         code_sample = code_dec.sample(n_samples=code_bsz, latent_z=latent_sketch.repeat(code_bsz, 1, 1), latent_mask=sketch_mask_p.repeat(code_bsz, 1), top_k=1, top_p=0)
 
         # filter code, only keep unique code
@@ -151,11 +130,11 @@ def sample(args):
         # generate the full CAD model
         latent_sketch = latent_sketch.repeat(len(total_code), 1, 1)
         sketch_mask_p = sketch_mask_p.repeat(len(total_code), 1)
-        xy_samples, _code_, _code_mask_, _latent_z_, _latent_mask_ = sketch_dec.sample(total_code, total_code_mask, pix_all, latent_sketch, sketch_mask_p,top_k=10, top_p=0)
+        xy_samples, _code_, _code_mask_, _latent_z_, _latent_mask_ = sketch_dec.sample(total_code, total_code_mask, latent_sketch, sketch_mask_p,top_k=1, top_p=0)
         result = xy_samples[0]
         param = pix2param(result, SKETCH_PAD)
         plot(param, result_folder, name)
-
+        count += 1
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
