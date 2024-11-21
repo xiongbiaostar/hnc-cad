@@ -8,7 +8,7 @@
             "name": "Python Debugger: Codebook_profile",
             "type": "debugpy",
             "request": "launch",
-            "program": "codebook/train.py",
+            "program": "codebook/train_RPlan_2Lvl.py",
             "console": "integratedTerminal",
             "args": [
                 "--output", "proj_log/RPlan2Level/profile",
@@ -27,6 +27,21 @@
                 "--output", "proj_log/RPlan2Level/loop",
                 "--batchsize", "450",
                 "--format", "loop",
+                "--device", "0"
+            ]
+        },
+        {
+            "name": "Python Debugger: Cond_Generate",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "gen/cond_generation.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--output", "proj_log/RPlan2Level/result/",
+                "--weight", "proj_log/RPlan2Level/gen_full",
+                "--profile_code", "proj_log/RPlan2Level/profile.pkl",
+                "--loop_code", "proj_log/RPlan2Level/loop.pkl",
+                "--mode", "cond",
                 "--device", "0"
             ]
         }

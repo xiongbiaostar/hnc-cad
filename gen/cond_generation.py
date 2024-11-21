@@ -49,19 +49,39 @@ def pix2param(coord_full, SKETCH_PAD):
 
     return params
 
+import os
+import matplotlib.pyplot as plt
+from matplotlib.patches import Polygon
+from matplotlib.collections import PatchCollection
+
 def plot(points, save_folder, name):
     plt.figure()
     colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'orange']
+    patches = []  # 用于存储多边形
+
     for i in range(len(points)):
         room_points = points[i]
         color = colors[i % len(colors)]
+        
+        # 将多边形点添加到 Patch
+        polygon = Polygon(room_points, closed=True, facecolor=color, alpha=0.3, edgecolor=color)
+        patches.append(polygon)
+        
+        # 绘制线条
         for j in range(len(room_points)):
             next_index = (j + 1) % len(room_points)
-            plt.plot([room_points[j][0], room_points[next_index][0]], [room_points[j][1], room_points[next_index][1]],'o-', color = color)
+            plt.plot([room_points[j][0], room_points[next_index][0]], 
+                     [room_points[j][1], room_points[next_index][1]], 
+                     'o-', color=color)
+    
+    # 添加多边形到图表
+    for patch in patches:
+        plt.gca().add_patch(patch)
 
     plt.xlabel("X coordinate")
     plt.ylabel("Y coordinate")
 
+    # 保存图片
     save_path = os.path.join(save_folder, f"room_{int(name[0])}.png")
     plt.savefig(save_path)
     plt.close()
@@ -77,16 +97,20 @@ def sample(args):
     code_size = dataset.profile_unique_num + dataset.loop_unique_num
 
     # Load model weights
+    sketch_enc_path = os.path.normpath(os.path.join(args.weight, 'sketch_enc_epoch_500.pt'))
+    #sketch_enc_path = 'proj_log/RPlan2Level/gen_full/sketch_enc_epoch_500.pt'
     sketch_enc = SketchEncoder()
-    sketch_enc.load_state_dict(torch.load(os.path.join(args.weight, 'sketch_enc_epoch_500.pt')))
+    sketch_enc.load_state_dict(torch.load(sketch_enc_path))
     sketch_enc.cuda().eval()
 
+    sketch_dec_path = os.path.normpath(os.path.join(args.weight, 'sketch_dec_epoch_500.pt'))
     sketch_dec = SketchDecoder(args.mode, num_code=code_size)
-    sketch_dec.load_state_dict(torch.load(os.path.join(args.weight, 'sketch_dec_epoch_500.pt')))
+    sketch_dec.load_state_dict(torch.load(sketch_dec_path))
     sketch_dec.cuda().eval()
 
+    code_dec_path = os.path.normpath(os.path.join(args.weight, 'code_dec_epoch_500.pt'))
     code_dec = CodeDecoder(args.mode, code_size)
-    code_dec.load_state_dict(torch.load(os.path.join(args.weight, 'code_dec_epoch_500.pt')))
+    code_dec.load_state_dict(torch.load(code_dec_path))
     code_dec.cuda().eval()
 
     # Random sampling
@@ -116,6 +140,7 @@ def sample(args):
             code_uid = code.tobytes()
             if code_uid not in code_unique:
                 code_unique[code_uid] = code
+
         total_code = []
         total_code_mask = []
         for _, code in code_unique.items():

@@ -355,8 +355,8 @@ class CodeDecoder(nn.Module):
 
     def sample(self, n_samples=10, latent_z=None, latent_mask=None, top_k=0, top_p=0.95):
         """
-    sample from distribution (top-k, top-p)
-    """
+        sample from distribution (top-k, top-p)
+        """
         for k in range(MAX_CODE):
             if k == 0:
                 v_seq = [None] * n_samples
