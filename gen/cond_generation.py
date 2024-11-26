@@ -54,34 +54,34 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 from matplotlib.collections import PatchCollection
 
-def plot(points, save_folder, name):
-    plt.figure()
-    colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'orange']
-    patches = []  # 用于存储多边形
+def draw_polygon(ax, points, color_index, colors):
+    room_points = points
+    color = colors[color_index % len(colors)]
+
+    polygon = Polygon(room_points, closed=True, facecolor=color, alpha=0.3, edgecolor=color)
+    ax.add_patch(polygon)
+
+    for j in range(len(room_points)):
+        next_index = (j + 1) % len(room_points)
+        ax.plot([room_points[j][0], room_points[next_index][0]],
+                [room_points[j][1], room_points[next_index][1]],
+                'o-', color=color)
+
+def plot(points, point_ori, save_folder, name, colors=['b', 'g', 'r', 'c', 'm', 'y', 'k', 'orange']):
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
 
     for i in range(len(points)):
-        room_points = points[i]
-        color = colors[i % len(colors)]
-        
-        # 将多边形点添加到 Patch
-        polygon = Polygon(room_points, closed=True, facecolor=color, alpha=0.3, edgecolor=color)
-        patches.append(polygon)
-        
-        # 绘制线条
-        for j in range(len(room_points)):
-            next_index = (j + 1) % len(room_points)
-            plt.plot([room_points[j][0], room_points[next_index][0]], 
-                     [room_points[j][1], room_points[next_index][1]], 
-                     'o-', color=color)
-    
-    # 添加多边形到图表
-    for patch in patches:
-        plt.gca().add_patch(patch)
+        draw_polygon(ax1, points[i], i, colors)
 
-    plt.xlabel("X coordinate")
-    plt.ylabel("Y coordinate")
+    ax1.set_xlabel("X coordinate")
+    ax1.set_ylabel("Y coordinate")
 
-    # 保存图片
+    for i in range(len(point_ori)):
+        draw_polygon(ax2, point_ori[i], i, colors)
+
+    ax2.set_xlabel("X coordinate")
+    ax2.set_ylabel("Y coordinate")
+
     save_path = os.path.join(save_folder, f"room_{int(name[0])}.png")
     plt.savefig(save_path)
     plt.close()
@@ -157,8 +157,10 @@ def sample(args):
         sketch_mask_p = sketch_mask_p.repeat(len(total_code), 1)
         xy_samples, _code_, _code_mask_, _latent_z_, _latent_mask_ = sketch_dec.sample(total_code, total_code_mask, latent_sketch, sketch_mask_p,top_k=1, top_p=0)
         result = xy_samples[0]
-        param = pix2param(result, SKETCH_PAD)
-        plot(param, result_folder, name)
+        param_pred = pix2param(result, SKETCH_PAD)
+        coord_ori = coord_p.cpu().numpy()[0]
+        param_ori = pix2param(coord_ori, SKETCH_PAD)
+        plot(param_ori, param_pred, result_folder, name)
         count += 1
 
 if __name__ == "__main__":
