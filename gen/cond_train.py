@@ -11,6 +11,55 @@ from model.network import schedule_with_warmup
 from model.encoder import SketchEncoder, ExtEncoder
 from model.decoder import SketchDecoder, ExtDecoder, CodeDecoder
 
+def evaluate(dataloader, sketch_enc, sketch_dec, code_dec, device):
+    sketch_enc.eval()
+    sketch_dec.eval()
+    code_dec.eval()
+
+    total_loss = 0
+    total_batches = 0
+
+    progress_bar = tqdm(total=len(dataloader), desc='Evaluating')
+    with torch.no_grad():
+        for pixel_p, coord_p, sketch_mask_p, pixel, coord, sketch_mask, code, code_mask, _ in dataloader:
+            pixel_p = pixel_p.to(device)
+            coord_p = coord_p.to(device)
+            sketch_mask_p = sketch_mask_p.to(device)
+            pixel = pixel.to(device)
+            coord = coord.to(device)
+            sketch_mask = sketch_mask.to(device)
+            code = code.to(device)
+            code_mask = code_mask.to(device)
+
+            # Partial Token Encoder
+            latent_sketch = sketch_enc(pixel_p, coord_p, sketch_mask_p)
+
+            # Pass through sketch decoder
+            sketch_logits = sketch_dec(pixel[:, :-1], coord[:, :-1, :], code, code_mask, latent_sketch, sketch_mask_p)
+
+            # Pass through code decoder
+            code_logits = code_dec(code[:, :-1], latent_sketch, sketch_mask_p)
+
+            # Compute losses
+            valid_mask = (~sketch_mask).reshape(-1)
+            sketch_pred = sketch_logits.reshape(-1, sketch_logits.shape[-1])
+            sketch_gt = pixel.reshape(-1)
+            sketch_loss = F.cross_entropy(sketch_pred[valid_mask], sketch_gt[valid_mask])
+
+            valid_mask = (~code_mask).reshape(-1)
+            code_pred = code_logits.reshape(-1, code_logits.shape[-1])
+            code_gt = code.reshape(-1)
+            code_loss = F.cross_entropy(code_pred[valid_mask], code_gt[valid_mask])
+
+            total_loss += (sketch_loss + code_loss).item()
+            total_batches += 1
+
+            progress_bar.update(1)
+
+    progress_bar.close()
+    avg_loss = total_loss / total_batches if total_batches > 0 else 0
+    return avg_loss
+
 
 def train(args):
     # gpu device
@@ -18,12 +67,24 @@ def train(args):
     device = torch.device("cuda:0")
 
     # Initialize dataset loader
-    dataset = CADData(CAD_TRAIN_PATH, Boundaries_path, args.profile_code, args.loop_code, args.mode, is_training=True)
-    code_size = dataset.profile_unique_num + dataset.loop_unique_num
-    dataloader = torch.utils.data.DataLoader(dataset,
-                                             shuffle=True,
-                                             batch_size=args.batchsize,
-                                             num_workers=6)
+    traindataset = CADData(PROFILE_TRAIN_PATH, LOOP_TRAIN_PATH, TRAIN_PROFILE_CODE, TRAIN_LOOP_CODE, args.mode, is_training=True)
+    traindataloader = torch.utils.data.DataLoader(traindataset,
+                                                  shuffle=True,
+                                                  batch_size=args.batchsize,
+                                                  num_workers=6)
+
+    valdataset = CADData(PROFILE_VAL_PATH, LOOP_VAL_PATH, VAL_PROFILE_CODE, VAL_LOOP_CODE, args.mode, is_training=True)
+    valdataloader = torch.utils.data.DataLoader(valdataset,
+                                                shuffle=False,
+                                                batch_size=args.batchsize,
+                                                num_workers=6)
+    testdataset = CADData(PROFILE_TEST_PATH, LOOP_TEST_PATH, TEST_PROFILE_CODE, TEST_LOOP_CODE, args.mode, is_training=True)
+    testdataloader = torch.utils.data.DataLoader(testdataset,
+                                                 shuffle=False,
+                                                 batch_size=args.batchsize,
+                                                 num_workers=6)
+
+    code_size = traindataset.profile_unique_num + traindataset.loop_unique_num
 
     # Initialize models
     sketch_dec = SketchDecoder(args.mode, num_code=code_size)
@@ -47,10 +108,10 @@ def train(args):
     iters = 0
     print('Start training...')
     for epoch in range(COND_TRAIN_EPOCH):
-        progress_bar = tqdm(total=len(dataloader))
+        progress_bar = tqdm(total=len(traindataloader))
         progress_bar.set_description(f"Epoch {epoch}")
 
-        for pixel_p, coord_p, sketch_mask_p, pixel, coord, sketch_mask, code, code_mask, _ in dataloader:
+        for pixel_p, coord_p, sketch_mask_p, pixel, coord, sketch_mask, code, code_mask, _ in traindataloader:
             pixel_p = pixel_p.to(device)
             coord_p = coord_p.to(device)
             sketch_mask_p = sketch_mask_p.to(device)
@@ -63,13 +124,8 @@ def train(args):
             # Partial Token Encoder
             latent_sketch = sketch_enc(pixel_p, coord_p, sketch_mask_p)
 
-            # latent_z = torch.cat([latent_sketch, latent_extrude], 1)
-            # latent_mask = torch.cat([sketch_mask_p, ext_mask_p], 1)
-
             # Pass through sketch decoder
             sketch_logits = sketch_dec(pixel[:, :-1], coord[:, :-1, :], code, code_mask, latent_sketch, sketch_mask_p)
-
-            # Pass through extrude decoder
 
             # Pass through code decoder
             code_logits = code_dec(code[:, :-1], latent_sketch, sketch_mask_p)
@@ -89,9 +145,9 @@ def train(args):
 
             # logging
             if iters % 10 == 0:
-                writer.add_scalar("Loss/Total", total_loss, iters)
-                writer.add_scalar("Loss/sketch", sketch_loss, iters)
-                writer.add_scalar("Loss/code", code_loss, iters)
+                writer.add_scalar("Loss/Train_Total", total_loss, iters)
+                writer.add_scalar("Loss/Train_sketch", sketch_loss, iters)
+                writer.add_scalar("Loss/Train_code", code_loss, iters)
 
             # Update model
             optimizer.zero_grad()
@@ -103,6 +159,12 @@ def train(args):
             progress_bar.update(1)
 
         progress_bar.close()
+
+        val_loss = evaluate(valdataloader, sketch_enc, sketch_dec, code_dec, device)
+        test_loss = evaluate(testdataloader, sketch_enc, sketch_dec, code_dec, device)
+        writer.add_scalar("Loss/Val", val_loss, epoch)
+        writer.add_scalar("Loss/Test", test_loss, epoch)
+        print(f"Epoch {epoch}: Val_Loss = {val_loss:.4f}, Test_Loss = {test_loss:.4f}")
         writer.flush()
 
         # # save model after n epoch
