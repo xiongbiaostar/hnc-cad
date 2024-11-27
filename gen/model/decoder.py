@@ -29,9 +29,10 @@ class SketchDecoder(nn.Module):
             self.code_embed = Embedder(num_code + CODE_PAD, self.embed_dim)
             self.mempos_embed = PositionalEncoding(max_len=MAX_CODE + MAX_CAD, d_model=self.embed_dim)
 
-        layers = TransformerDecoderLayerImproved(d_model=self.embed_dim, nhead=DECODER_CONFIG['num_heads'],
-                                                 dim_feedforward=DECODER_CONFIG['hidden_dim'],
-                                                 dropout=DECODER_CONFIG['dropout_rate'])
+        layers = TransformerDecoderLayerImproved(d_model = self.embed_dim, 
+                                                 nhead = DECODER_CONFIG['num_heads'],
+                                                 dim_feedforward = DECODER_CONFIG['hidden_dim'],
+                                                 dropout = DECODER_CONFIG['dropout_rate'])
         self.network = TransformerDecoder(layers, DECODER_CONFIG['num_layers'], LayerNorm(self.embed_dim))
 
         self.pixel_logit = nn.Linear(self.embed_dim, 2 ** CAD_BIT * 2 ** CAD_BIT + SKETCH_PAD)
@@ -59,16 +60,17 @@ class SketchDecoder(nn.Module):
         # Memory embedding
         if self.mode == 'cond':
             latent_z = torch.cat([latent_z, self.code_embed(code)], 1)
-            memory_embeds = self.mempos_embed(latent_z.transpose(0, 1))
+            latent_embeds = self.mempos_embed(latent_z.transpose(0, 1))
             memory_key_padding_mask = torch.cat([latent_mask, code_mask], 1)
         else:
             latent_z = self.code_embed(code)
-            memory_embeds = self.mempos_embed(latent_z.transpose(0, 1))
+            latent_embeds = self.mempos_embed(latent_z.transpose(0, 1))
             memory_key_padding_mask = code_mask
 
         # Decoder
         nopeak_mask = torch.nn.Transformer.generate_square_subsequent_mask(seqlen + 1).cuda()  # masked with -inf
-        decoder_out = self.network(tgt=decoder_input, memory=memory_embeds,
+        decoder_out = self.network(tgt=decoder_input, 
+                                   memory=latent_embeds,
                                    memory_key_padding_mask=memory_key_padding_mask, \
                                    tgt_mask=nopeak_mask)
         decoder_out = decoder_out.transpose(0, 1)
@@ -223,16 +225,16 @@ class ExtDecoder(nn.Module):
         # Memory embedding
         if self.mode == 'cond':
             latent_z = torch.cat([latent_z, self.code_embed(code)], 1)
-            memory_embeds = self.mempos_embed(latent_z.transpose(0, 1))
+            latent_embeds = self.mempos_embed(latent_z.transpose(0, 1))
             memory_key_padding_mask = torch.cat([latent_mask, code_mask], 1)
         else:
             latent_z = self.code_embed(code)
-            memory_embeds = self.mempos_embed(latent_z.transpose(0, 1))
+            latent_embeds = self.mempos_embed(latent_z.transpose(0, 1))
             memory_key_padding_mask = code_mask
 
         # Decoder
         nopeak_mask = torch.nn.Transformer.generate_square_subsequent_mask(seqlen + 1).cuda()  # masked with -inf
-        decoder_out = self.network(tgt=decoder_input, memory=memory_embeds,
+        decoder_out = self.network(tgt=decoder_input, memory=latent_embeds,
                                    memory_key_padding_mask=memory_key_padding_mask, tgt_mask=nopeak_mask)
         decoder_out = decoder_out.transpose(0, 1)
 
@@ -335,19 +337,20 @@ class CodeDecoder(nn.Module):
             embeddings = self.code_embed(code)
             decoder_inputs = torch.cat([context_embedding, embeddings], axis=1)
             decoder_inputs = self.pos_embed(decoder_inputs.transpose(0, 1))
-
         else:
             decoder_inputs = self.pos_embed(context_embedding.transpose(0, 1))
 
         if self.mode == 'uncond':
-            memory_embeds = None
+            latent_embeds = None
         else:
-            memory_embeds = self.mempos_embed(latent_z.transpose(0, 1))
+            latent_embeds = self.mempos_embed(latent_z.transpose(0, 1))
 
         nopeak_mask = torch.nn.Transformer.generate_square_subsequent_mask(
             decoder_inputs.shape[0]).cuda()  # masked with -inf
-        decoder_out = self.decoder(tgt=decoder_inputs, memory=memory_embeds, memory_key_padding_mask=latent_mask,
-                                   tgt_mask=nopeak_mask)
+        decoder_out = self.decoder(tgt = decoder_inputs, 
+                                   memory = latent_embeds, 
+                                   memory_key_padding_mask = latent_mask,
+                                   tgt_mask = nopeak_mask)
 
         # Get logits
         logits = self.fc(decoder_out)

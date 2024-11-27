@@ -89,7 +89,13 @@ def plot(points, point_ori, save_folder, name, colors=['b', 'g', 'r', 'c', 'm', 
 @torch.inference_mode()
 def sample(args):
     os.environ["CUDA_VISIBLE_DEVICES"] = args.device
-    dataset = CADData(CAD_TRAIN_PATH, Boundaries_path, args.profile_code, args.loop_code, args.mode, is_training=False)
+
+    dataset = CADData(PROFILE_TRAIN_PATH,
+                      LOOP_TRAIN_PATH,
+                      args.profile_code,
+                      args.loop_code,
+                      args.mode,
+                      is_training=False)
     dataloader = torch.utils.data.DataLoader(dataset,
                                              shuffle=False,
                                              batch_size=1,
@@ -124,10 +130,14 @@ def sample(args):
         sketch_mask_p = sketch_mask_p.cuda()
 
         # encode partial CAD model
-        latent_sketch = sketch_enc(pixel_p, coord_p, sketch_mask_p)
+        sketch_latent = sketch_enc(pixel_p, coord_p, sketch_mask_p)
 
         # generate the neural code tree
-        code_sample = code_dec.sample(n_samples=code_bsz, latent_z=latent_sketch.repeat(code_bsz, 1, 1), latent_mask=sketch_mask_p.repeat(code_bsz, 1), top_k=1, top_p=0)
+        code_sample = code_dec.sample(n_samples = code_bsz,
+                                      latent_z = sketch_latent.repeat(code_bsz, 1, 1), 
+                                      latent_mask = sketch_mask_p.repeat(code_bsz, 1), 
+                                      top_k = 1, 
+                                      top_p = 0)
 
         # filter code, only keep unique code
         # if len(code_sample) < 3:
@@ -147,15 +157,18 @@ def sample(args):
             _code_, _code_mask_ = dataset.pad_code(code)
             total_code.append(_code_)
             total_code_mask.append(_code_mask_)
+
         total_code = np.vstack(np.vstack(total_code))
         total_code_mask = np.vstack(total_code_mask)
         total_code = torch.LongTensor(total_code).cuda()
         total_code_mask = torch.BoolTensor(total_code_mask).cuda()
 
         # generate the full CAD model
-        latent_sketch = latent_sketch.repeat(len(total_code), 1, 1)
+        sketch_latent = sketch_latent.repeat(len(total_code), 1, 1)
         sketch_mask_p = sketch_mask_p.repeat(len(total_code), 1)
-        xy_samples, _code_, _code_mask_, _latent_z_, _latent_mask_ = sketch_dec.sample(total_code, total_code_mask, latent_sketch, sketch_mask_p,top_k=1, top_p=0)
+        xy_samples, _code_, _code_mask_, _latent_z_, _latent_mask_ = sketch_dec.sample(
+            total_code, total_code_mask, sketch_latent, sketch_mask_p, top_k=1, top_p=0)
+        
         result = xy_samples[0]
         param_pred = pix2param(result, SKETCH_PAD)
         coord_ori = coord_p.cpu().numpy()[0]
