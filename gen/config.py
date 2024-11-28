@@ -28,13 +28,6 @@ LOOP_TRAIN_PATH = 'data/loop/train.pkl'
 LOOP_VAL_PATH = 'data/loop/val.pkl'
 LOOP_TEST_PATH = 'data/loop/test.pkl'
 
-TRAIN_PROFILE_CODE = 'train/profile.pkl'
-TRAIN_LOOP_CODE = 'train/loop.pkl'
-VAL_PROFILE_CODE = 'val/profile.pkl'
-VAL_LOOP_CODE = 'val/loop.pkl'
-TEST_PROFILE_CODE = 'test/profile.pkl'
-TEST_LOOP_CODE = 'test/loop.pkl'
-
 ENCODER_CONFIG = {
     'hidden_dim': 512,
     'embed_dim': 256,

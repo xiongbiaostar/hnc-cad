@@ -67,18 +67,18 @@ def train(args):
     device = torch.device("cuda:0")
 
     # Initialize dataset loader
-    traindataset = CADData(PROFILE_TRAIN_PATH, LOOP_TRAIN_PATH, TRAIN_PROFILE_CODE, TRAIN_LOOP_CODE, args.mode, is_training=True)
+    traindataset = CADData(PROFILE_TRAIN_PATH, LOOP_TRAIN_PATH, args.profile_code, args.loop_code, args.mode, is_training=True)
     traindataloader = torch.utils.data.DataLoader(traindataset,
                                                   shuffle=True,
                                                   batch_size=args.batchsize,
                                                   num_workers=6)
 
-    valdataset = CADData(PROFILE_VAL_PATH, LOOP_VAL_PATH, VAL_PROFILE_CODE, VAL_LOOP_CODE, args.mode, is_training=True)
+    valdataset = CADData(PROFILE_VAL_PATH, LOOP_VAL_PATH, args.profile_code, args.loop_code, args.mode, is_training=True)
     valdataloader = torch.utils.data.DataLoader(valdataset,
                                                 shuffle=False,
                                                 batch_size=args.batchsize,
                                                 num_workers=6)
-    testdataset = CADData(PROFILE_TEST_PATH, LOOP_TEST_PATH, TEST_PROFILE_CODE, TEST_LOOP_CODE, args.mode, is_training=True)
+    testdataset = CADData(PROFILE_TEST_PATH, LOOP_TEST_PATH, args.profile_code, args.loop_code, args.mode, is_training=True)
     testdataloader = torch.utils.data.DataLoader(testdataset,
                                                  shuffle=False,
                                                  batch_size=args.batchsize,
