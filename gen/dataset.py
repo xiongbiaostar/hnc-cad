@@ -223,7 +223,7 @@ class CADData(torch.utils.data.Dataset):
             pixels = vec_data['pixel']
             coords = vec_data['coord']
 
-            return pixels, coords, sketch_mask, pixels_aug, coords_aug, code, code_mask, vec_data['name']
+            return pixels, coords, sketch_mask, pixels_aug, coords_aug, code, code_mask, vec_data['name'], vec_data['param']
 
         else:  # conditional
             assert self.mode == 'cond'
@@ -248,7 +248,7 @@ class CADData(torch.utils.data.Dataset):
             pixels = vec_data['pixel']
             coords = vec_data['coord']
 
-            return pixels_par, coords_par, sketch_mask_par, pixels, coords, sketch_mask, code, code_mask, vec_data['name']
+            return pixels_par, coords_par, sketch_mask_par, pixels, coords, sketch_mask, code, code_mask, vec_data['name'], vec_data['param']
 
 
 class CodeData(torch.utils.data.Dataset):

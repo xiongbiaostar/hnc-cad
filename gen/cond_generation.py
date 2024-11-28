@@ -3,7 +3,7 @@ import torch
 import argparse
 from PIL import Image, ImageDraw
 from matplotlib import pyplot as plt
-
+from matplotlib.patches import Polygon
 from config import *
 from hashlib import sha256
 import numpy as np
@@ -49,38 +49,35 @@ def pix2param(coord_full, SKETCH_PAD):
 
     return params
 
-import os
-import matplotlib.pyplot as plt
-from matplotlib.patches import Polygon
-from matplotlib.collections import PatchCollection
+def draw_polygon(ax, points_list, colors):
+    for index, points in enumerate(points_list):
+        room_points = points
+        color = colors[index % len(colors)]
 
-def draw_polygon(ax, points, color_index, colors):
-    room_points = points
-    color = colors[color_index % len(colors)]
+        # 将多边形点添加到 Patch
+        polygon = Polygon(room_points, closed=True, facecolor=color, alpha=0.3, edgecolor=color)
+        ax.add_patch(polygon)
 
-    polygon = Polygon(room_points, closed=True, facecolor=color, alpha=0.3, edgecolor=color)
-    ax.add_patch(polygon)
+        for j in range(len(room_points)):
+            next_index = (j + 1) % len(room_points)
+            ax.plot([room_points[j][0], room_points[next_index][0]],
+                    [room_points[j][1], room_points[next_index][1]],
+                    'o-', color=color)
+    ax.set_xlabel("X coordinate")
+    ax.set_ylabel("Y coordinate")
 
-    for j in range(len(room_points)):
-        next_index = (j + 1) % len(room_points)
-        ax.plot([room_points[j][0], room_points[next_index][0]],
-                [room_points[j][1], room_points[next_index][1]],
-                'o-', color=color)
+def plot(boundaries, param_ori, param_pred_sel1, param_pred_sel2, save_folder, name, colors=['b', 'g', 'r', 'c', 'm', 'y', 'k', 'orange']):
+    fig, axs = plt.subplots(2, 2, figsize=(12, 12))
 
-def plot(points, point_ori, save_folder, name, colors=['b', 'g', 'r', 'c', 'm', 'y', 'k', 'orange']):
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
+    draw_polygon(axs[0, 0], boundaries, colors)
+    draw_polygon(axs[0, 1], param_ori, colors)
+    draw_polygon(axs[1, 0], param_pred_sel1, colors)
+    draw_polygon(axs[1, 1], param_pred_sel2, colors)
 
-    for i in range(len(points)):
-        draw_polygon(ax1, points[i], i, colors)
-
-    ax1.set_xlabel("X coordinate")
-    ax1.set_ylabel("Y coordinate")
-
-    for i in range(len(point_ori)):
-        draw_polygon(ax2, point_ori[i], i, colors)
-
-    ax2.set_xlabel("X coordinate")
-    ax2.set_ylabel("Y coordinate")
+    axs[0, 0].set_title('GT')
+    axs[0, 1].set_title('Outer contour')
+    axs[1, 0].set_title('Predict 1')
+    axs[1, 1].set_title('Predict 2')
 
     save_path = os.path.join(save_folder, f"room_{int(name[0])}.png")
     plt.savefig(save_path)
@@ -103,26 +100,22 @@ def sample(args):
     code_size = dataset.profile_unique_num + dataset.loop_unique_num
 
     # Load model weights
-    sketch_enc_path = os.path.normpath(os.path.join(args.weight, 'sketch_enc_epoch_500.pt'))
-    #sketch_enc_path = 'proj_log/RPlan2Level/gen_full/sketch_enc_epoch_500.pt'
     sketch_enc = SketchEncoder()
-    sketch_enc.load_state_dict(torch.load(sketch_enc_path))
+    sketch_enc.load_state_dict(torch.load(os.path.join(args.weight, 'sketch_enc_epoch_750.pt')))
     sketch_enc.cuda().eval()
 
-    sketch_dec_path = os.path.normpath(os.path.join(args.weight, 'sketch_dec_epoch_500.pt'))
     sketch_dec = SketchDecoder(args.mode, num_code=code_size)
-    sketch_dec.load_state_dict(torch.load(sketch_dec_path))
+    sketch_dec.load_state_dict(torch.load(os.path.join(args.weight, 'sketch_dec_epoch_750.pt')))
     sketch_dec.cuda().eval()
 
-    code_dec_path = os.path.normpath(os.path.join(args.weight, 'code_dec_epoch_500.pt'))
     code_dec = CodeDecoder(args.mode, code_size)
-    code_dec.load_state_dict(torch.load(code_dec_path))
+    code_dec.load_state_dict(torch.load(os.path.join(args.weight, 'code_dec_epoch_750.pt')))
     code_dec.cuda().eval()
 
     # Random sampling
-    code_bsz = 1  # every partial input samples this many neural codes
+    code_bsz = 10  # every partial input samples this many neural codes
     count = 0
-    for pixel_p, coord_p, sketch_mask_p, _, _, _, _, _,name in dataloader:
+    for pixel_p, coord_p, sketch_mask_p, _, _, _, _, _,name, boundaries in dataloader:
         if count > 200: break  # only visualize the first 50 examples
 
         pixel_p = pixel_p.cuda()
@@ -136,8 +129,8 @@ def sample(args):
         code_sample = code_dec.sample(n_samples = code_bsz,
                                       latent_z = sketch_latent.repeat(code_bsz, 1, 1), 
                                       latent_mask = sketch_mask_p.repeat(code_bsz, 1), 
-                                      top_k = 1, 
-                                      top_p = 0)
+                                      top_k = 0,
+                                      top_p = 0.95)
 
         # filter code, only keep unique code
         # if len(code_sample) < 3:
@@ -166,14 +159,16 @@ def sample(args):
         # generate the full CAD model
         sketch_latent = sketch_latent.repeat(len(total_code), 1, 1)
         sketch_mask_p = sketch_mask_p.repeat(len(total_code), 1)
-        xy_samples, _code_, _code_mask_, _latent_z_, _latent_mask_ = sketch_dec.sample(
-            total_code, total_code_mask, sketch_latent, sketch_mask_p, top_k=1, top_p=0)
-        
-        result = xy_samples[0]
-        param_pred = pix2param(result, SKETCH_PAD)
+        xy_samples, _code_, _code_mask_, _latent_z_, _latent_mask_ = sketch_dec.sample(total_code, total_code_mask, sketch_latent, sketch_mask_p,top_k=1, top_p=0)
+        if len(xy_samples) >= 2:
+            param_pred_sel1 = pix2param(xy_samples[0], SKETCH_PAD)
+            param_pred_sel2 = pix2param(xy_samples[1], SKETCH_PAD)
+        else:
+            param_pred_sel1 = param_pred_sel2 = pix2param(xy_samples[1], SKETCH_PAD)
+        GT_boundaries = [tensor.squeeze(0).numpy().tolist() for tensor in boundaries]
         coord_ori = coord_p.cpu().numpy()[0]
         param_ori = pix2param(coord_ori, SKETCH_PAD)
-        plot(param_ori, param_pred, result_folder, name)
+        plot(GT_boundaries, param_ori, param_pred_sel1, param_pred_sel2, result_folder, name)
         count += 1
 
 if __name__ == "__main__":
