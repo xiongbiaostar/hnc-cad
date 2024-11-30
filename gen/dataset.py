@@ -35,35 +35,48 @@ class CADData(torch.utils.data.Dataset):
         boundaries_dict = {item['uid']: item['param'] for item in boundaries_data}
         print("Loading dataset...")
         for room in tqdm(room_data):
-            sketchProfileCode = []
-            sketchLoopCode = []
-            valid = True
+            if is_training:
+                sketchProfileCode = []
+                sketchLoopCode = []
+                valid = True
 
-            profile_uid = room['uid']
-            if profile_uid not in self.profile_code:
-                valid = False
-                continue
-            profile_code = self.profile_code[profile_uid] + self.loop_unique_num  # profile code index
-            sketchProfileCode.append(profile_code)
-
-            # LOOP code
-            loop_codes = []
-            boundaries = []
-            num_loop = len(room['profile'])
-            for idx_loop in range(num_loop):
-                loop_uid = profile_uid + '_' + str(idx_loop)
-                if loop_uid not in self.loop_code:
+                profile_uid = room['uid']
+                if profile_uid not in self.profile_code:
                     valid = False
                     continue
-                if loop_uid in boundaries_dict:
-                    param = boundaries_dict[loop_uid]
-                    boundaries.append(param)
-                loop_code = self.loop_code[loop_uid]  # Loop code index
-                loop_codes.append(loop_code)
-            sketchLoopCode.append(loop_codes)
+                profile_code = self.profile_code[profile_uid] + self.loop_unique_num  # profile code index
+                sketchProfileCode.append(profile_code)
 
-            if not valid:
-                continue
+                # LOOP code
+                loop_codes = []
+                boundaries = []
+                num_loop = len(room['profile'])
+                for idx_loop in range(num_loop):
+                    loop_uid = profile_uid + '_' + str(idx_loop)
+                    if loop_uid not in self.loop_code:
+                        valid = False
+                        continue
+                    if loop_uid in boundaries_dict:
+                        param = boundaries_dict[loop_uid]
+                        boundaries.append(param)
+                    loop_code = self.loop_code[loop_uid]  # Loop code index
+                    loop_codes.append(loop_code)
+                sketchLoopCode.append(loop_codes)
+
+                if not valid:
+                    continue
+            else:
+                sketchProfileCode = []
+                sketchLoopCode = []
+                boundaries = []
+                profile_uid = room['uid']
+                num_loop = len(room['profile'])
+                for idx_loop in range(num_loop):
+                    loop_uid = profile_uid + '_' + str(idx_loop)
+                    if loop_uid in boundaries_dict:
+                        param = boundaries_dict[loop_uid]
+                        boundaries.append(param)
+
 
             # Global cad parameters
             pixel_full, coord_full = self.param2pix(boundaries)
