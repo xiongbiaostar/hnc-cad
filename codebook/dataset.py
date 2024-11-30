@@ -89,7 +89,7 @@ class ProfileData(torch.utils.data.Dataset):
         # Filter data for training 
         self.data = []
         for data in dataset:
-            bboxs = data['profile']
+            bboxs = np.array(data['profile'])
             num_bbox = len(bboxs)
                         
             if num_bbox<=MAX_PROFILE:
@@ -104,7 +104,9 @@ class ProfileData(torch.utils.data.Dataset):
 
 
     def get_corners(self, boxes):
-        x_min, x_max, y_min, y_max = boxes.T
+        x_min, y_min, x_max, y_max = boxes.T
+        x_min, x_max = np.minimum(x_min, x_max), np.maximum(x_min, x_max)
+        y_min, y_max = np.minimum(y_min, y_max), np.maximum(y_min, y_max)
         x_span, y_span = x_max-x_min, y_max-y_min
         xywh = np.concatenate([x_min[:,np.newaxis], y_min[:,np.newaxis], x_span[:,np.newaxis], y_span[:,np.newaxis]], 1) 
         return xywh
@@ -156,24 +158,14 @@ class LoopData(torch.utils.data.Dataset):
         # Filter data  
         self.data = []
         for data in dataset:
-            cmd_full = data['cmd']
             param_full = data['param']
 
             tokens = []
-            for cc, pp in zip(cmd_full, param_full):
-                if cc == 3: # circle 
-                    tokens.append(pp[0:2])
-                    tokens.append(pp[2:4])
-                    tokens.append(pp[4:6])
-                    tokens.append(pp[6:8])
-                    tokens.append(np.array([-1,-1]))
-                elif cc == 2: # arc
-                    tokens.append(pp[0:2])
-                    tokens.append(pp[2:4])
-                    tokens.append(np.array([-1,-1]))
-                elif cc == 1: # line
-                    tokens.append(pp[0:2])
-                    tokens.append(np.array([-1,-1]))
+
+            for pp in param_full:
+                tokens.append(pp)
+                tokens.append(np.array([-1,-1]))
+
             # EOS
             tokens.append(np.array([-2,-2]))
             tokens = np.vstack(tokens) 

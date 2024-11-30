@@ -14,32 +14,32 @@ MAX_SOLID = 5
 SOLID_CODEBOOK_DIM = 10000 # or optionally use 5000
 
 # PROFILE CONFIG
-PROFILE_TRAIN_PATH = 'data/profile/train_deduplicate.pkl'
+PROFILE_TRAIN_PATH = 'data/profile/train.pkl'
 PROFILE_FULL_PATH = 'data/profile/train.pkl'
 PROFILE_PARAM_SEQ = 4
-MAX_PROFILE = 20 
+MAX_PROFILE = 20
 PROFILE_CODEBOOK_DIM = 5000
 
 # LOOP CONFIG
-LOOP_TRAIN_PATH = 'data/loop/train_deduplicate.pkl'
+LOOP_TRAIN_PATH = 'data/loop/train.pkl'
 LOOP_FULL_PATH = 'data/loop/train.pkl'
 LOOP_PARAM_PAD = 2
 LOOP_PARAM_SEQ = 2
-MAX_LOOP = 60 
+MAX_LOOP = 80
 LOOP_CODEBOOK_DIM = 5000
 
 # NETWORK CONFIG
 ENCODER_CONFIG = {
     'hidden_dim': 512,
     'embed_dim': 256,  
-    'num_layers': 4,   
+    'num_layers': 4,
     'num_heads': 8,
     'dropout_rate': 0.1  
 }
 DECODER_CONFIG = {
     'hidden_dim': 512,
     'embed_dim': 256,  
-    'num_layers': 4,   
+    'num_layers': 4,
     'num_heads': 8,
     'dropout_rate': 0.1
 }

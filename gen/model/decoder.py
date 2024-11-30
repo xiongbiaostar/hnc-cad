@@ -26,7 +26,7 @@ class SketchDecoder(nn.Module):
       self.mempos_embed = PositionalEncoding(max_len=MAX_CODE, d_model=self.embed_dim)
     else:
       self.code_embed = Embedder(num_code+CODE_PAD, self.embed_dim)
-      self.mempos_embed = PositionalEncoding(max_len=MAX_CODE+MAX_EXT+MAX_CAD, d_model=self.embed_dim)
+      self.mempos_embed = PositionalEncoding(max_len=MAX_CODE+MAX_CAD, d_model=self.embed_dim)
 
     layers = TransformerDecoderLayerImproved(d_model=self.embed_dim, nhead=DECODER_CONFIG['num_heads'], 
         dim_feedforward=DECODER_CONFIG['hidden_dim'], dropout=DECODER_CONFIG['dropout_rate'])
