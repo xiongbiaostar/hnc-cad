@@ -49,13 +49,11 @@ def extract_code(args):
 
     data_path = {
         "solid": SOLID_FULL_PATH,
-        "profile": [PROFILE_TRAIN_PATH, PROFILE_VAL_PATH, PROFILE_TEST_PATH],
-        "loop": [LOOP_TRAIN_PATH, LOOP_VAL_PATH, LOOP_TEST_PATH],
+        "profile": PROFILE_FULL_PATH,
+        "loop": LOOP_FULL_PATH,
     }
 
-    dataset = []
-    for path in data_path[args.format]:
-        dataset.extend(data_func[args.format](path))
+    dataset = data_func[args.format](data_path[args.format])
     dataloader = torch.utils.data.DataLoader(dataset, 
                                              shuffle=False, 
                                              batch_size=1024,
