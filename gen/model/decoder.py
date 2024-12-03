@@ -79,7 +79,7 @@ class SketchDecoder(nn.Module):
 
         return pixel_logits
 
-    def sample(self, code, code_mask, latent=None, latent_mask=None, top_k=0, top_p=0.95):
+    def sample(self, code, code_mask, pixel_p=None, coord_p=None,latent=None, latent_mask=None, top_k=0, top_p=0.95):
         # Mapping from pixel index to xy coordiante
         pixel2xy = {}
         x = np.linspace(0, 2 ** CAD_BIT - 1, 2 ** CAD_BIT)
@@ -99,8 +99,17 @@ class SketchDecoder(nn.Module):
 
         for k in range(MAX_CAD):
             if k == 0:
-                pixel_seq = [None] * n_samples
-                xy_seq = [None] * n_samples
+                if pixel_p is not None and coord_p is not None:
+                    pixel_p_nonzero = pixel_p[pixel_p != 0]
+                    coord_squeezed = coord_p.squeeze(0)
+                    unique_indices = torch.unique(torch.nonzero(coord_squeezed, as_tuple=True)[0])
+                    coord_p_nonzero = coord_squeezed[unique_indices, :]
+
+                    pixel_seq = pixel_p_nonzero.repeat(n_samples, 1)
+                    xy_seq = coord_p_nonzero.repeat(n_samples, 1, 1)
+                else:
+                    pixel_seq = [None] * n_samples
+                    xy_seq = [None] * n_samples
 
             with torch.no_grad():
                 p_pred = self.forward(pixel_seq, xy_seq, code, code_mask, latent, latent_mask)

@@ -87,8 +87,8 @@ def plot(boundaries, param_ori, param_pred_sel1, param_pred_sel2, save_folder, n
 def sample(args):
     os.environ["CUDA_VISIBLE_DEVICES"] = args.device
 
-    dataset = CADData(PROFILE_TRAIN_PATH,
-                      LOOP_TRAIN_PATH,
+    dataset = CADData(PROFILE_TEST_PATH,
+                      LOOP_TEST_PATH,
                       args.profile_code,
                       args.loop_code,
                       args.mode,
@@ -159,12 +159,12 @@ def sample(args):
         # generate the full CAD model
         sketch_latent = sketch_latent.repeat(len(total_code), 1, 1)
         sketch_mask_p = sketch_mask_p.repeat(len(total_code), 1)
-        xy_samples, _code_, _code_mask_, _latent_z_, _latent_mask_ = sketch_dec.sample(total_code, total_code_mask, sketch_latent, sketch_mask_p,top_k=1, top_p=0)
+        xy_samples, _code_, _code_mask_, _latent_z_, _latent_mask_ = sketch_dec.sample(total_code, total_code_mask,pixel_p, coord_p, sketch_latent, sketch_mask_p,top_k=1, top_p=0)
         if len(xy_samples) >= 2:
             param_pred_sel1 = pix2param(xy_samples[0], SKETCH_PAD)
             param_pred_sel2 = pix2param(xy_samples[1], SKETCH_PAD)
         else:
-            param_pred_sel1 = param_pred_sel2 = pix2param(xy_samples[1], SKETCH_PAD)
+            param_pred_sel1 = param_pred_sel2 = pix2param(xy_samples[0], SKETCH_PAD)
         GT_boundaries = [tensor.squeeze(0).numpy().tolist() for tensor in boundaries]
         coord_ori = coord_p.cpu().numpy()[0]
         param_ori = pix2param(coord_ori, SKETCH_PAD)
