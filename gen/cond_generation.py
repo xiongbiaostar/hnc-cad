@@ -1,9 +1,8 @@
 import os
 import torch
 import argparse
-from PIL import Image, ImageDraw
 from matplotlib import pyplot as plt
-from matplotlib.patches import Polygon
+from matplotlib.patches import Polygon as MatplotlibPolygon
 from config import *
 from hashlib import sha256
 import numpy as np
@@ -11,7 +10,7 @@ from dataset import CADData
 from utils import CADparser, write_obj_sample
 from model.encoder import SketchEncoder, ExtEncoder
 from model.decoder import SketchDecoder, ExtDecoder, CodeDecoder
-
+from shapely.geometry import Polygon
 
 def raster_cad(coord, ext):
     parser = CADparser(CAD_BIT)
@@ -55,7 +54,7 @@ def draw_polygon(ax, points_list, colors):
         color = colors[index % len(colors)]
 
         # 将多边形点添加到 Patch
-        polygon = Polygon(room_points, closed=True, facecolor=color, alpha=0.3, edgecolor=color)
+        polygon = MatplotlibPolygon(room_points, closed=True, facecolor=color, alpha=0.3, edgecolor=color)
         ax.add_patch(polygon)
 
         for j in range(len(room_points)):
@@ -82,6 +81,36 @@ def plot(boundaries, param_ori, param_pred_sel1, param_pred_sel2, save_folder, n
     save_path = os.path.join(save_folder, f"room_{int(name[0])}.png")
     plt.savefig(save_path)
     plt.close()
+
+def calculate_coverage(data):
+
+    wall_polygon = Polygon(data[0])
+    wall_area = wall_polygon.area
+
+    room_polygons = [Polygon(room) for room in data[1:]]
+    room_areas = [room.area for room in room_polygons]
+    total_area = sum(room_areas)
+    #房间和外墙之间并集
+    room_intersections = [wall_polygon.intersection(room).area for room in room_polygons]
+    total_room_area = sum(room_intersections)
+
+    #房间和外墙之间差集
+    outside_areas = [room.difference(wall_polygon).area for room in room_polygons]
+    total_outside_area = sum(outside_areas)
+
+    #判断房间之间重叠
+    overlap_areas = []
+    for i in range(1, len(data)):
+        for j in range(i + 1, len(data)):
+            overlap = Polygon(data[i]).intersection(Polygon(data[j])).area
+            overlap_areas.append(overlap)
+    total_overlap_area = sum(overlap_areas)
+
+    coverage = (total_room_area - total_overlap_area) / wall_area
+    overlap_percent = total_overlap_area / total_area
+    outside_percent = total_outside_area / total_area
+
+    return coverage, overlap_percent, outside_percent
 
 @torch.inference_mode()
 def sample(args):
@@ -169,6 +198,10 @@ def sample(args):
         coord_ori = coord_p.cpu().numpy()[0]
         param_ori = pix2param(coord_ori, SKETCH_PAD)
         plot(GT_boundaries, param_ori, param_pred_sel1, param_pred_sel2, result_folder, name)
+        coverage_sel1, total_overlap_area_sel1, total_outside_area_sel1 = calculate_coverage(param_pred_sel1)
+        coverage_sel2, total_outside_area_sel2, total_overlap_area_sel2 = calculate_coverage(param_pred_sel2)
+        print("predict1:", f"覆盖度: {coverage_sel1:.4f}", f"房间之间的重叠度: {total_overlap_area_sel1:.4f}", f"房间超出外墙部分: {total_outside_area_sel1:.4f}")
+        print("predict2:", f"覆盖度: {coverage_sel2:.4f}", f"房间之间的重叠度: {total_overlap_area_sel2:.4f}", f"房间超出外墙部分: {total_outside_area_sel2:.4f}")
         count += 1
 
 if __name__ == "__main__":
