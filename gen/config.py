@@ -10,16 +10,19 @@ EXTRUDE_R = 1
 BBOX_RANGE = 1
 CUBOID_RANGE = 1
 MAX_CAD = 200
+MAX_TYPE = 10
 MAX_CODE = 35
-SKETCH_PAD = 3
+SKETCH_PAD = 2
+TYPE_NUM = 7
 EXT_PAD = 2
 CODE_PAD = 3
+TYPE_PAD = 1
 
 ################
 # Train Config #
 ################
 UNCOND_TRAIN_EPOCH = 350
-COND_TRAIN_EPOCH = 250
+COND_TRAIN_EPOCH = 1000
 CAD_TRAIN_PATH = 'data/model/train_deduplicate.pkl'
 PROFILE_TRAIN_PATH = 'data/profile/train.pkl'
 PROFILE_VAL_PATH = 'data/profile/val.pkl'

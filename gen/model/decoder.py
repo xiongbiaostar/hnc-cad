@@ -8,17 +8,18 @@ from model.network import *
 import torch.nn as nn
 
 
+
 class SketchDecoder(nn.Module):
     """
-  Autoregressive generative model 
-  """
+    Autoregressive generative model
+    """
 
     def __init__(self, mode, num_code=None):
         super(SketchDecoder, self).__init__()
         self.embed_dim = DECODER_CONFIG['embed_dim']
-        self.coord_embed_x = Embedder(2 ** CAD_BIT + SKETCH_PAD, self.embed_dim)
-        self.coord_embed_y = Embedder(2 ** CAD_BIT + SKETCH_PAD, self.embed_dim)
-        self.pixel_embeds = Embedder(2 ** CAD_BIT * 2 ** CAD_BIT + SKETCH_PAD, self.embed_dim)
+        self.coord_embed_x = Embedder(2 ** CAD_BIT + SKETCH_PAD + TYPE_NUM, self.embed_dim)
+        self.coord_embed_y = Embedder(2 ** CAD_BIT + SKETCH_PAD + TYPE_NUM, self.embed_dim)
+        self.pixel_embeds = Embedder(2 ** CAD_BIT * 2 ** CAD_BIT + SKETCH_PAD + TYPE_NUM, self.embed_dim)
         self.pos_embed = PositionalEncoding(max_len=MAX_CAD, d_model=self.embed_dim)
         self.mode = mode
 
@@ -29,15 +30,15 @@ class SketchDecoder(nn.Module):
             self.code_embed = Embedder(num_code + CODE_PAD, self.embed_dim)
             self.mempos_embed = PositionalEncoding(max_len=MAX_CODE + MAX_CAD, d_model=self.embed_dim)
 
-        layers = TransformerDecoderLayerImproved(d_model = self.embed_dim, 
-                                                 nhead = DECODER_CONFIG['num_heads'],
-                                                 dim_feedforward = DECODER_CONFIG['hidden_dim'],
-                                                 dropout = DECODER_CONFIG['dropout_rate'])
+        layers = TransformerDecoderLayerImproved(d_model=self.embed_dim,
+                                                 nhead=DECODER_CONFIG['num_heads'],
+                                                 dim_feedforward=DECODER_CONFIG['hidden_dim'],
+                                                 dropout=DECODER_CONFIG['dropout_rate'])
         self.network = TransformerDecoder(layers, DECODER_CONFIG['num_layers'], LayerNorm(self.embed_dim))
 
-        self.pixel_logit = nn.Linear(self.embed_dim, 2 ** CAD_BIT * 2 ** CAD_BIT + SKETCH_PAD)
+        self.pixel_logit = nn.Linear(self.embed_dim, 2 ** CAD_BIT * 2 ** CAD_BIT + SKETCH_PAD + TYPE_NUM)
 
-    def forward(self, pixel, coord, code, code_mask, latent_z=None, latent_mask=None):
+    def forward(self, pixel, coord,  code, code_mask, latent_z=None, latent_mask=None):
         """ forward pass """
         if pixel[0] is None:
             bs = len(pixel)
@@ -45,7 +46,7 @@ class SketchDecoder(nn.Module):
         else:
             bs, seqlen = pixel.shape[0], pixel.shape[1]
 
-            # Context
+        # Context
         context_embeds = torch.zeros((bs, 1, self.embed_dim)).cuda()
 
         # Token embedding
@@ -69,17 +70,17 @@ class SketchDecoder(nn.Module):
 
         # Decoder
         nopeak_mask = torch.nn.Transformer.generate_square_subsequent_mask(seqlen + 1).cuda()  # masked with -inf
-        decoder_out = self.network(tgt=decoder_input, 
-                                   memory=latent_embeds,
-                                   memory_key_padding_mask=memory_key_padding_mask, \
-                                   tgt_mask=nopeak_mask)
+        decoder_out = self.network(tgt=decoder_input,                                #（200，256，256）
+                                   memory=latent_embeds,                            #（235，256，256）
+                                   memory_key_padding_mask=memory_key_padding_mask,  #（256，235）
+                                   tgt_mask=nopeak_mask)                             #（200，200）
         decoder_out = decoder_out.transpose(0, 1)
 
         pixel_logits = self.pixel_logit(decoder_out)
 
         return pixel_logits
 
-    def sample(self, code, code_mask, pixel_p=None, coord_p=None,latent=None, latent_mask=None, top_k=0, top_p=0.95):
+    def sample(self, code, code_mask, pixel_p=None, coord_p=None,  latent=None, latent_mask=None, top_k=0, top_p=0.95):
         # Mapping from pixel index to xy coordiante
         pixel2xy = {}
         x = np.linspace(0, 2 ** CAD_BIT - 1, 2 ** CAD_BIT)
@@ -91,6 +92,7 @@ class SketchDecoder(nn.Module):
 
         pix_samples = []
         xy_samples = []
+        type_samples = []
         latent_samples = []
         code_samples = []
         latent_mask_samples = []
@@ -109,6 +111,7 @@ class SketchDecoder(nn.Module):
                     xy_seq = coord_p_nonzero.repeat(n_samples, 1, 1)
                 else:
                     pixel_seq = [None] * n_samples
+                    type_seq = [None] * n_samples
                     xy_seq = [None] * n_samples
 
             with torch.no_grad():
@@ -121,10 +124,11 @@ class SketchDecoder(nn.Module):
                 next_pixel = torch.multinomial(F.softmax(filtered_logits, dim=-1), 1)
                 next_pixels.append(next_pixel.item())
 
+
             # Convert pixel index to xy coordinate
             next_xys = []
             for pixel in next_pixels:
-                if pixel >= SKETCH_PAD:
+                if pixel >= SKETCH_PAD + TYPE_NUM:
                     xy = pixel2xy[pixel - SKETCH_PAD]
                 else:
                     xy = np.array([pixel, pixel]).astype(int)
@@ -152,7 +156,7 @@ class SketchDecoder(nn.Module):
                 done_code = code[done_idx]
                 done_code_mask = code_mask[done_idx]
 
-                for pix, xy, _code_, _code_mask_ in zip(done_pixs, done_xys, done_code, done_code_mask):
+                for pix, xy,  _code_, _code_mask_ in zip(done_pixs, done_xys, done_code, done_code_mask):
                     pix = pix.detach().cpu().numpy()
                     xy = xy.detach().cpu().numpy()
                     pix_samples.append(pix)
@@ -330,8 +334,9 @@ class CodeDecoder(nn.Module):
         decoder_norm = LayerNorm(self.embed_dim)
         self.decoder = TransformerDecoder(decoder_layers, CODE_CONFIG['num_layers'], decoder_norm)
         self.fc = nn.Linear(self.embed_dim, num_code + CODE_PAD)
+        self.type_logit = nn.Linear(self.embed_dim, TYPE_NUM + TYPE_PAD)
 
-    def forward(self, code, latent_z=None, latent_mask=None):
+    def forward(self, code, latent_z=None, latent_mask=None, is_train = True):
         """ forward pass """
         if code[0] is None:
             bs = len(code)
@@ -354,8 +359,7 @@ class CodeDecoder(nn.Module):
         else:
             latent_embeds = self.mempos_embed(latent_z.transpose(0, 1))
 
-        nopeak_mask = torch.nn.Transformer.generate_square_subsequent_mask(
-            decoder_inputs.shape[0]).cuda()  # masked with -inf
+        nopeak_mask = torch.nn.Transformer.generate_square_subsequent_mask(decoder_inputs.shape[0]).cuda()  # masked with -inf
         decoder_out = self.decoder(tgt = decoder_inputs, 
                                    memory = latent_embeds, 
                                    memory_key_padding_mask = latent_mask,
@@ -363,7 +367,11 @@ class CodeDecoder(nn.Module):
 
         # Get logits
         logits = self.fc(decoder_out)
-        return logits.transpose(0, 1)
+        if is_train:
+            type_logits = self.type_logit(decoder_out[3:13,:,:])
+        else:
+            type_logits = self.type_logit(decoder_out)
+        return logits.transpose(0, 1), type_logits.transpose(0, 1)
 
     def sample(self, n_samples=10, latent_z=None, latent_mask=None, top_k=0, top_p=0.95):
         """
@@ -372,11 +380,13 @@ class CodeDecoder(nn.Module):
         for k in range(MAX_CODE):
             if k == 0:
                 v_seq = [None] * n_samples
+                v_type = [None] * n_samples
 
             # pass through decoder
             with torch.no_grad():
-                logits = self.forward(code=v_seq, latent_z=latent_z, latent_mask=latent_mask)
+                logits, type_logits = self.forward(code=v_seq, latent_z=latent_z, latent_mask=latent_mask, is_train=False)
                 logits = logits[:, -1, :]
+                type_logits = type_logits[:, -1, :]
 
                 # Top-p sampling
             next_vs = []
@@ -385,11 +395,79 @@ class CodeDecoder(nn.Module):
                 next_v = torch.multinomial(F.softmax(filtered_logits, dim=-1), 1)
                 next_vs.append(next_v.item())
 
+            next_type = []
+            for logit in type_logits:
+                filtered_logits = top_k_top_p_filtering(logit.clone(), top_k=top_k, top_p=top_p)
+                next_type = torch.multinomial(F.softmax(filtered_logits, dim=-1), 1)
+                next_type.append(next_type.item())
+
             # Add next tokens
             next_seq = torch.LongTensor(next_vs).view(len(next_vs), 1).cuda()
+            next_type = torch.LongTensor(next_type).view(len(next_type), 1).cuda()
             if v_seq[0] is None:
                 v_seq = next_seq
+                v_type = next_type
             else:
                 v_seq = torch.cat([v_seq, next_seq], 1)
+                v_type = torch.cat([v_type, next_type], 1)
 
-        return v_seq
+        return v_seq, v_type[3:13]
+
+
+    # def sample_eval(self, n_samples=10, latent_z=None, latent_mask=None, top_k=0, top_p=0.95):
+    #     """
+    #     sample from distribution (top-k, top-p)
+    #     """
+    #
+    #     for k in range(MAX_CODE):
+    #         if k == 0:
+    #             bs = latent_z.size(0) if latent_z is not None else 1
+    #             v_seq = [None] * bs
+    #
+    #         # 通过解码器传递
+    #         with torch.no_grad():
+    #             logits = self.forward(code=v_seq, latent_z=latent_z, latent_mask=latent_mask)
+    #             logits = logits[:, -1, :]  # 获取最后一个token的logits
+    #
+    #             # Top-p sampling
+    #         next_vs = []
+    #         for logit in logits:
+    #             filtered_logits = top_k_top_p_filtering(logit.clone(), top_k=top_k, top_p=top_p)
+    #             next_v = torch.multinomial(F.softmax(filtered_logits, dim=-1), 1)
+    #             next_vs.append(next_v)
+    #
+    #             # 将next_vs转换为张量
+    #         next_seq = torch.LongTensor(next_vs).view(len(next_vs), 1).cuda()
+    #
+    #         # 添加下一个token
+    #         if v_seq[0] is None:
+    #             v_seq = next_seq
+    #         else:
+    #             v_seq = torch.cat([v_seq, next_seq], 1)
+    #     return v_seq
+
+    def sample_eval(self, n_samples=10, latent_z=None, latent_mask=None, top_k=0, top_p=0.95):
+        """
+        sample from distribution (top-k, top-p)
+        """
+        bs = latent_z.size(0) if latent_z is not None else 1
+        v_seq = torch.zeros(bs, MAX_CODE, dtype=torch.long, device=latent_z.device if latent_z is not None else 'cuda')
+        type_seq = torch.zeros(bs, MAX_CODE, dtype=torch.long, device=latent_z.device if latent_z is not None else 'cuda')
+        with torch.no_grad():
+            for k in range(MAX_CODE):
+                logits, type_logits = self.forward(code=v_seq[:, :k], latent_z=latent_z, latent_mask=latent_mask, is_train=False)
+                logits = logits[:, -1, :]  # 获取最后一个token的logits
+                type_logits = type_logits[:, -1, :]
+
+                # Top-p sampling
+                filtered_logits = top_k_top_p_filtering_eval(logits, top_k=top_k, top_p=top_p)
+                next_v = torch.multinomial(F.softmax(filtered_logits, dim=-1), 1)
+
+                filtered_type = top_k_top_p_filtering_eval(type_logits, top_k=top_k, top_p=top_p)
+                next_type = torch.multinomial(F.softmax(filtered_type, dim=-1), 1)
+
+                # 添加下一个token
+                v_seq[:, k] = next_v.squeeze(-1)
+                type_seq[:, k] = next_type.squeeze(-1)
+
+        return v_seq, type_seq[:,3:13]

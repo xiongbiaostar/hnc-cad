@@ -58,6 +58,46 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')
         logits[indices_to_remove] = filter_value
     return logits
 
+def top_k_top_p_filtering_eval(logits, top_k=0, top_p=0.95, filter_value=-float('Inf')):
+    """
+    Filters a distribution of logits using top-k and/or nucleus (top-p) filtering.
+
+    Args:
+        logits: Tensor of shape (batch_size, vocab_size).
+        top_k: Keep only top k tokens with highest probability (0 disables top-k filtering).
+        top_p: Keep the top tokens with cumulative probability >= top_p (nucleus filtering).
+        filter_value: Value to replace filtered logits.
+
+    Returns:
+        Filtered logits with the same shape as input.
+    """
+    # Clone logits to avoid in-place modification
+    logits = logits.clone()
+
+    if top_k > 0:
+        # Top-k filtering
+        top_k = min(max(top_k, 1), logits.size(-1))  # Ensure top_k is valid
+        indices_to_remove = logits < torch.topk(logits, top_k, dim=-1).values[:, -1].unsqueeze(-1)
+        logits[indices_to_remove] = filter_value
+
+    if top_p > 0.0 and top_p < 1.0:
+        # Nucleus filtering
+        sorted_logits, sorted_indices = torch.sort(logits, descending=True, dim=-1)
+        cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+
+        # Remove tokens with cumulative probability above top_p
+        sorted_indices_to_remove = cumulative_probs > top_p
+        # Shift the mask to include the first token above the threshold
+        sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+        sorted_indices_to_remove[..., 0] = False
+
+        # Scatter to original indices
+        indices_to_remove = sorted_indices_to_remove.scatter(dim=-1, index=sorted_indices, src=sorted_indices_to_remove)
+        logits[indices_to_remove] = filter_value
+
+    return logits
+
+
 
 class Embedder(nn.Module):
     def __init__(self, vocab_size, d_model):
