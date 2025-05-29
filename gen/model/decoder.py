@@ -17,9 +17,9 @@ class SketchDecoder(nn.Module):
     def __init__(self, mode, num_code=None):
         super(SketchDecoder, self).__init__()
         self.embed_dim = DECODER_CONFIG['embed_dim']
-        self.coord_embed_x = Embedder(2 ** CAD_BIT + SKETCH_PAD + TYPE_NUM, self.embed_dim)
-        self.coord_embed_y = Embedder(2 ** CAD_BIT + SKETCH_PAD + TYPE_NUM, self.embed_dim)
-        self.pixel_embeds = Embedder(2 ** CAD_BIT * 2 ** CAD_BIT + SKETCH_PAD + TYPE_NUM, self.embed_dim)
+        self.coord_embed_x = Embedder(2 ** CAD_BIT + SKETCH_PAD, self.embed_dim)
+        self.coord_embed_y = Embedder(2 ** CAD_BIT + SKETCH_PAD, self.embed_dim)
+        self.pixel_embeds = Embedder(2 ** CAD_BIT * 2 ** CAD_BIT + SKETCH_PAD, self.embed_dim)
         self.pos_embed = PositionalEncoding(max_len=MAX_CAD, d_model=self.embed_dim)
         self.mode = mode
 
@@ -36,7 +36,7 @@ class SketchDecoder(nn.Module):
                                                  dropout=DECODER_CONFIG['dropout_rate'])
         self.network = TransformerDecoder(layers, DECODER_CONFIG['num_layers'], LayerNorm(self.embed_dim))
 
-        self.pixel_logit = nn.Linear(self.embed_dim, 2 ** CAD_BIT * 2 ** CAD_BIT + SKETCH_PAD + TYPE_NUM)
+        self.pixel_logit = nn.Linear(self.embed_dim, 2 ** CAD_BIT * 2 ** CAD_BIT + SKETCH_PAD)
 
     def forward(self, pixel, coord,  code, code_mask, latent_z=None, latent_mask=None):
         """ forward pass """
@@ -58,15 +58,11 @@ class SketchDecoder(nn.Module):
         else:
             decoder_input = self.pos_embed(context_embeds.transpose(0, 1))
 
-        # Memory embedding
-        if self.mode == 'cond':
-            latent_z = torch.cat([latent_z, self.code_embed(code)], 1)
-            latent_embeds = self.mempos_embed(latent_z.transpose(0, 1))
-            memory_key_padding_mask = torch.cat([latent_mask, code_mask], 1)
-        else:
-            latent_z = self.code_embed(code)
-            latent_embeds = self.mempos_embed(latent_z.transpose(0, 1))
-            memory_key_padding_mask = code_mask
+
+        latent_z = torch.cat([latent_z, self.code_embed(code)], 1)
+        latent_embeds = self.mempos_embed(latent_z.transpose(0, 1))
+        memory_key_padding_mask = torch.cat([latent_mask, code_mask], 1)
+
 
         # Decoder
         nopeak_mask = torch.nn.Transformer.generate_square_subsequent_mask(seqlen + 1).cuda()  # masked with -inf
@@ -80,7 +76,7 @@ class SketchDecoder(nn.Module):
 
         return pixel_logits
 
-    def sample(self, code, code_mask, pixel_p=None, coord_p=None,  latent=None, latent_mask=None, top_k=0, top_p=0.95):
+    def sample(self, code, code_mask, pixel_p=None, coord_p=None, latent=None, latent_mask=None, top_k=0, top_p=0.95):
         # Mapping from pixel index to xy coordiante
         pixel2xy = {}
         x = np.linspace(0, 2 ** CAD_BIT - 1, 2 ** CAD_BIT)
@@ -111,7 +107,6 @@ class SketchDecoder(nn.Module):
                     xy_seq = coord_p_nonzero.repeat(n_samples, 1, 1)
                 else:
                     pixel_seq = [None] * n_samples
-                    type_seq = [None] * n_samples
                     xy_seq = [None] * n_samples
 
             with torch.no_grad():
@@ -124,17 +119,17 @@ class SketchDecoder(nn.Module):
                 next_pixel = torch.multinomial(F.softmax(filtered_logits, dim=-1), 1)
                 next_pixels.append(next_pixel.item())
 
-
             # Convert pixel index to xy coordinate
             next_xys = []
             for pixel in next_pixels:
-                if pixel >= SKETCH_PAD + TYPE_NUM:
+                if pixel >= SKETCH_PAD:
                     xy = pixel2xy[pixel - SKETCH_PAD]
                 else:
                     xy = np.array([pixel, pixel]).astype(int)
                 next_xys.append(xy)
             next_xys = np.vstack(next_xys)  # [BS, 2]
             next_pixels = np.vstack(next_pixels)  # [BS, 1]
+
 
             # Add next tokens
             nextp_seq = torch.LongTensor(next_pixels).view(len(next_pixels), 1).cuda()
@@ -156,7 +151,7 @@ class SketchDecoder(nn.Module):
                 done_code = code[done_idx]
                 done_code_mask = code_mask[done_idx]
 
-                for pix, xy,  _code_, _code_mask_ in zip(done_pixs, done_xys, done_code, done_code_mask):
+                for pix, xy, _code_, _code_mask_ in zip(done_pixs, done_xys, done_code, done_code_mask):
                     pix = pix.detach().cpu().numpy()
                     xy = xy.detach().cpu().numpy()
                     pix_samples.append(pix)
@@ -398,8 +393,8 @@ class CodeDecoder(nn.Module):
             next_type = []
             for logit in type_logits:
                 filtered_logits = top_k_top_p_filtering(logit.clone(), top_k=top_k, top_p=top_p)
-                next_type = torch.multinomial(F.softmax(filtered_logits, dim=-1), 1)
-                next_type.append(next_type.item())
+                next_t = torch.multinomial(F.softmax(filtered_logits, dim=-1), 1)
+                next_type.append(next_t.item())
 
             # Add next tokens
             next_seq = torch.LongTensor(next_vs).view(len(next_vs), 1).cuda()
@@ -411,7 +406,7 @@ class CodeDecoder(nn.Module):
                 v_seq = torch.cat([v_seq, next_seq], 1)
                 v_type = torch.cat([v_type, next_type], 1)
 
-        return v_seq, v_type[3:13]
+        return v_seq, v_type[:,3:]
 
 
     # def sample_eval(self, n_samples=10, latent_z=None, latent_mask=None, top_k=0, top_p=0.95):

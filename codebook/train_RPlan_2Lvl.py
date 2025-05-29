@@ -55,7 +55,7 @@ def parse_aug(format):
 
 from tqdm import tqdm
 
-def evaluate(dataloader, encoder, decoder):
+def evaluate(dataloader, encoder, decoder, format):
     encoder.eval()
     decoder.eval()
 
@@ -73,16 +73,32 @@ def evaluate(dataloader, encoder, decoder):
 
             # Forward pass
             latent_code, vq_loss, _, _ = encoder(param, seq_mask)
-            param_logits = decoder(param, seq_mask, ignore_mask, latent_code)
+            param_logits, type_logits = decoder(param, seq_mask, ignore_mask, latent_code)  # 输入掩码，原参数和对应codebook表示进行解码
 
             # Compute loss
-            param_loss = squared_emd_loss(
-                logits=param_logits,
-                labels=param,
-                num_classes=param_logits.shape[-1],
-                mask=ignore_mask
-            )
-            total_loss += (param_loss + vq_loss).item()
+            if format == "profile":
+                param_loss = squared_emd_loss(logits=param_logits,
+                                              labels=param[:, :, 1:],
+                                              num_classes=param_logits.shape[-1],
+                                              mask=ignore_mask[:, :, 1:])
+
+                type_loss = squared_emd_loss(logits=type_logits,
+                                             labels=param[:, :, 0:1],
+                                             num_classes=type_logits.shape[-1],
+                                             mask=ignore_mask[:, :, 0:1])
+            else:
+                param_loss = squared_emd_loss(logits=param_logits,
+                                              labels=param[:, 1:, :],
+                                              num_classes=param_logits.shape[-1],
+                                              mask=ignore_mask[:, 1:, :])
+
+                type_loss = squared_emd_loss(logits=type_logits,
+                                             labels=param[:, 0:1, :],
+                                             num_classes=type_logits.shape[-1],
+                                             mask=ignore_mask[:, 0:1, :])
+
+            # Compute loss
+            total_loss += (param_loss + vq_loss + type_loss).item()
             total_batches += 1
 
             # Update progress bar
@@ -150,8 +166,17 @@ def train(args):
     iters = 0
     print('Start training...')
     for epoch in range(TOTAL_TRAIN_EPOCH):
+
+        encoder.train()
+        decoder.train()
         progress_bar = tqdm(total=len(traindataloader))
         progress_bar.set_description(f"Epoch {epoch}")
+
+        total_loss_all = 0
+        param_loss_all = 0
+        vq_loss_all = 0
+        type_loss_all = 0
+        total_batches = 0
 
         for param, seq_mask, ignore_mask, _ in traindataloader:  # seq_mask是对填充部分的掩码, ignore_mask是随机掩码部分。 param=(6,5,6)(batch_size,max_solid,solid_param_seq)    seq_mask,ignore_mask=(6,5) (batch_size,max_solid)
             param = param.cuda()  # param=(6,20,4)
@@ -159,28 +184,49 @@ def train(args):
             ignore_mask = ignore_mask.cuda()
 
             # Pass through encoder
-            latent_code, vq_loss, selection, _ = encoder(param,
-                                                         seq_mask)  # latent_code(6,1,256)最近邻选中的向量，selection对应codebook中的索引。
+            latent_code, vq_loss, selection, _ = encoder(param, seq_mask)  # latent_code(6,1,256)最近邻选中的向量，selection对应codebook中的索引。
 
             # Pass through decoder
-            param_logits = decoder(param, seq_mask, ignore_mask, latent_code)  # 输入掩码，原参数和对应codebook表示进行解码
+            param_logits, type_logits = decoder(param, seq_mask, ignore_mask, latent_code)  # 输入掩码，原参数和对应codebook表示进行解码
 
             # Compute loss
-            param_loss = squared_emd_loss(logits=param_logits,
-                                          labels=param,
-                                          num_classes=param_logits.shape[-1],
-                                          mask=ignore_mask)
+            if args.format == "profile":
+                param_loss = squared_emd_loss(logits=param_logits,
+                                            labels=param[:, :, 1:],
+                                            num_classes=param_logits.shape[-1],
+                                            mask=ignore_mask[:, :, 1:])
 
-            total_loss = param_loss + vq_loss
+                type_loss = squared_emd_loss(logits=type_logits,
+                                            labels=param[:, :, 0:1],
+                                            num_classes=type_logits.shape[-1],
+                                            mask=ignore_mask[:, :, 0:1])
+            else:
+                param_loss = squared_emd_loss(logits=param_logits,
+                                              labels=param[:, 1:, :],
+                                              num_classes=param_logits.shape[-1],
+                                              mask=ignore_mask[:, 1:, :])
 
-            # logging
-            if iters % 10 == 0:
-                writer.add_scalar("Loss/Train_Total", total_loss.item(), iters)
-                writer.add_scalar("Loss/Train_Coord", param_loss.item(), iters)
-                writer.add_scalar("Loss/Train_VQ", vq_loss.item(), iters)
+                type_loss = squared_emd_loss(logits=type_logits,
+                                             labels=param[:, 0:1, :],
+                                             num_classes=type_logits.shape[-1],
+                                             mask=ignore_mask[:, 0:1, :])
 
-            if iters % 20 == 0 and selection is not None:
-                writer.add_histogram('selection', selection, iters)
+
+            total_loss = param_loss + vq_loss + type_loss
+
+            total_loss_all += total_loss
+            type_loss_all += type_loss
+            vq_loss_all += vq_loss
+            param_loss_all += param_loss
+            total_batches += 1
+            # # logging
+            # if iters % 10 == 0:
+            #     writer.add_scalar("Loss/Train_Total", total_loss.item(), iters)
+            #     writer.add_scalar("Loss/Train_Coord", param_loss.item(), iters)
+            #     writer.add_scalar("Loss/Train_VQ", vq_loss.item(), iters)
+            #
+            # if iters % 20 == 0 and selection is not None:
+            #     writer.add_histogram('selection', selection, iters)
 
             # Update model
             optimizer.zero_grad()
@@ -191,11 +237,20 @@ def train(args):
             iters += 1
             progress_bar.update(1)
 
+        total_loss = total_loss_all / total_batches if total_batches > 0 else 0
+        param_loss = param_loss_all / total_batches if total_batches > 0 else 0
+        type_loss = type_loss_all / total_batches if total_batches > 0 else 0
+        vq_loss = vq_loss_all / total_batches if total_batches > 0 else 0
+        writer.add_scalar("Loss/Train_total", total_loss, epoch)
+        writer.add_scalar("Loss/Train_param", param_loss, epoch)
+        writer.add_scalar("Loss/Train_type", type_loss, epoch)
+        writer.add_scalar("Loss/Train_vq", vq_loss, epoch)
+
         progress_bar.close()
 
         # Evaluate on validation and test sets
-        val_loss = evaluate(valdataloader, encoder, decoder)
-        test_loss = evaluate(testdataloader, encoder, decoder)
+        val_loss = evaluate(valdataloader, encoder, decoder, args.format)
+        test_loss = evaluate(testdataloader, encoder, decoder, args.format)
         writer.add_scalar("Loss/Val", val_loss, epoch)
         writer.add_scalar("Loss/Test", test_loss, epoch)
         print(f"Epoch {epoch}: Val_Loss = {val_loss:.4f}, Test_Loss = {test_loss:.4f}")

@@ -4,7 +4,7 @@ MASK_RATIO_HIGH = 0.7
 BIT = 6
 REINIT_THRESHOLD = 7
 REINIT_TRAIN_EPOCH = 200
-TOTAL_TRAIN_EPOCH = 250
+TOTAL_TRAIN_EPOCH = 500
 
 # SOLID CONFIG
 SOLID_TRAIN_PATH = 'data/solid/train_deduplicate.pkl'
@@ -20,7 +20,7 @@ PROFILE_TRAIN_PATH = 'data/profile/train.pkl'
 PROFILE_VAL_PATH = 'data/profile/val.pkl'
 PROFILE_TEST_PATH = 'data/profile/test.pkl'
 PROFILE_FULL_PATH = 'data/profile/train.pkl'
-PROFILE_PARAM_SEQ = 4
+PROFILE_PARAM_SEQ = 5
 MAX_PROFILE = 20
 PROFILE_CODEBOOK_DIM = 5000
 
@@ -29,9 +29,10 @@ LOOP_TRAIN_PATH = 'data/loop/train.pkl'
 LOOP_VAL_PATH = 'data/loop/val.pkl'
 LOOP_TEST_PATH = 'data/loop/test.pkl'
 LOOP_FULL_PATH = 'data/loop/train.pkl'
-LOOP_PARAM_PAD = 2
+LOOP_PARAM_PAD = 1
 LOOP_PARAM_SEQ = 2
-MAX_LOOP = 80
+TYPE_PARAM_PAD = 8
+MAX_LOOP = 40
 LOOP_CODEBOOK_DIM = 5000
 
 # NETWORK CONFIG

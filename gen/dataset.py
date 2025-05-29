@@ -125,7 +125,7 @@ class CADData(torch.utils.data.Dataset):
                 if boundaries == []:
                     continue
 
-            types = [profile[-1] + 1 for profile in room['profile']]
+            types = [profile[0] for profile in room['profile']]
             # Global cad parameters
             pixel_full, coord_full = self.param2pix(boundaries)
 
@@ -170,7 +170,7 @@ class CADData(torch.utils.data.Dataset):
             coords = []
             pixels = []
 
-            for param in boundary[:-1]:
+            for param in boundary[1:]:
                 coords.append(param)
 
             coords.append(np.array([-1, -1]))
@@ -201,7 +201,7 @@ class CADData(torch.utils.data.Dataset):
             coords = []
             pixels = []
 
-            for param in boundary[:-1]:
+            for param in boundary[1:]:
                 coords.append(param)
 
             coords.append(np.array([-1, -1]))
