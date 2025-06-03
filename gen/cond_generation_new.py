@@ -5,6 +5,8 @@ import torch
 import argparse
 from matplotlib import pyplot as plt
 from matplotlib.patches import Polygon as MatplotlibPolygon
+from shapely.ops import unary_union
+
 from config import *
 from hashlib import sha256
 import numpy as np
@@ -276,11 +278,26 @@ def calculate_coverage_and_statistics(data, room_type_num):
     total_outside_area = 0
     total_overlap_area = 0
 
-    # 统计 Tvec 和 Svec
+    overlap_union_polygon = Polygon()
+    outside_union_polygon = Polygon()
+
     for i, (poly, room_type) in enumerate(zip(room_polygons, room_types)):
         Tvec[room_type] += 1
-        inter_area = wall_polygon.intersection(poly).area
-        diff_area = poly.difference(wall_polygon).area
+
+        # 计算和墙体重叠部分，去除已统计区域
+        inter_poly = wall_polygon.intersection(poly)
+        new_inter_poly = inter_poly.difference(outside_union_polygon)
+        inter_area = new_inter_poly.area
+        if inter_area > 1e-6:
+            outside_union_polygon = outside_union_polygon.union(new_inter_poly)
+
+        # 计算房间多余部分（超出墙体），去除已统计区域
+        diff_poly = poly.difference(wall_polygon)
+        new_diff_poly = diff_poly.difference(outside_union_polygon)
+        diff_area = new_diff_poly.area
+        if diff_area > 1e-6:
+            outside_union_polygon = outside_union_polygon.union(new_diff_poly)
+
         Svec[room_type] += inter_area
         total_room_area += inter_area
         total_outside_area += diff_area
@@ -292,21 +309,30 @@ def calculate_coverage_and_statistics(data, room_type_num):
             poly_j = room_polygons[j]
 
             # 判断是否有重叠面积
-            inter_area = poly_i.intersection(poly_j).area
+            inter_poly = poly_i.intersection(poly_j)
+            new_overlap_poly = inter_poly.difference(overlap_union_polygon)
+            inter_area = new_overlap_poly.area
             if inter_area > 1e-6:
                 total_overlap_area += inter_area
+                overlap_union_polygon = overlap_union_polygon.union(new_overlap_poly)
 
-            # 判断是否在边界上接触（相邻）
+            # 判断是否相邻（边界接触）
             if poly_i.touches(poly_j):
                 type_i = room_types[i]
                 type_j = room_types[j]
                 Avec[type_i] += 1
                 Avec[type_j] += 1
 
-    # 最终指标
-    coverage = (total_room_area - total_overlap_area) / wall_area
-    overlap_percent = total_overlap_area / wall_area
-    outside_percent = total_outside_area / wall_area
+    room_union = unary_union(room_polygons)
+
+    covered_polygon = wall_polygon.intersection(room_union)
+
+    covered_area = covered_polygon.area
+    wall_area = wall_polygon.area
+
+    coverage = covered_area / wall_area
+    overlap_percent = total_overlap_area / (wall_area + total_overlap_area)
+    outside_percent = total_outside_area / (wall_area + total_outside_area)
 
     return coverage, overlap_percent, outside_percent, Tvec, Avec, Svec
 
@@ -456,8 +482,8 @@ def sample(args):
 
 
             count += 1
-            print("------------------------------")
-            print("count = ", count)
+            # print("------------------------------")
+            # print("count = ", count)
             # print("cover_count =", cover_count)
             # print("cover_allcount = ", cover_allcount)
             # print("rating =", cover_count/cover_allcount)
