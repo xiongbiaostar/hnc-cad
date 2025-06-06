@@ -10,7 +10,7 @@ import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 from model.network import schedule_with_warmup
 from model.encoder import SketchEncoder, ExtEncoder
-from model.decoder import SketchDecoder, ExtDecoder, CodeDecoder
+from model.decoder import SketchDecoder, CodeDecoder
 
 
 def pad_code(code_sample):
@@ -96,16 +96,16 @@ def train(args):
                                                   batch_size=args.batchsize,
                                                   num_workers=6)
 
-    valdataset = CADData(PROFILE_VAL_PATH, LOOP_VAL_PATH, args.profile_code, args.loop_code, args.mode, ori_param = False, is_training=False)
-    valdataloader = torch.utils.data.DataLoader(valdataset,
-                                                shuffle=False,
-                                                batch_size=args.batchsize,
-                                                num_workers=6)
-    testdataset = CADData(PROFILE_TEST_PATH, LOOP_TEST_PATH, args.profile_code, args.loop_code, args.mode, ori_param= False, is_training=False)
-    testdataloader = torch.utils.data.DataLoader(testdataset,
-                                                 shuffle=False,
-                                                 batch_size=args.batchsize,
-                                                 num_workers=6)
+    # valdataset = CADData(PROFILE_VAL_PATH, LOOP_VAL_PATH, args.profile_code, args.loop_code, args.mode, ori_param = False, is_training=False)
+    # valdataloader = torch.utils.data.DataLoader(valdataset,
+    #                                             shuffle=False,
+    #                                             batch_size=args.batchsize,
+    #                                             num_workers=6)
+    # testdataset = CADData(PROFILE_TEST_PATH, LOOP_TEST_PATH, args.profile_code, args.loop_code, args.mode, ori_param= False, is_training=False)
+    # testdataloader = torch.utils.data.DataLoader(testdataset,
+    #                                              shuffle=False,
+    #                                              batch_size=args.batchsize,
+    #                                              num_workers=6)
 
     code_size = traindataset.profile_unique_num + traindataset.loop_unique_num
 
@@ -145,11 +145,11 @@ def train(args):
         coverage = 0
         total_overlap_area = 0
         total_outside_area = 0
+        #
+        # val_loss = evaluate(valdataloader, sketch_enc, sketch_dec, code_dec)
+        # test_loss = evaluate(testdataloader, sketch_enc, sketch_dec, code_dec)
 
-        val_loss = evaluate(valdataloader, sketch_enc, sketch_dec, code_dec)
-        test_loss = evaluate(testdataloader, sketch_enc, sketch_dec, code_dec)
-
-        for pixel_p, coord_p, sketch_mask_p, pixel, coord,  sketch_mask, code, code_mask,types, types_mask, _ in traindataloader:
+        for pixel_p, coord_p, sketch_mask_p, pixel, coord,  sketch_mask, code, code_mask, _ in traindataloader:
             pixel_p = pixel_p.to(device)
             coord_p = coord_p.to(device)
             sketch_mask_p = sketch_mask_p.to(device)
@@ -158,17 +158,16 @@ def train(args):
             sketch_mask = sketch_mask.to(device)
             code = code.to(device)
             code_mask = code_mask.to(device)
-            types = types.to(device)
-            types_mask = types_mask.to(device)
+
 
             # Partial Token Encoder
             latent_sketch = sketch_enc(pixel_p, coord_p,  sketch_mask_p)
 
             # Pass through sketch decoder
-            sketch_logits = sketch_dec(pixel[:, :-1], coord[:, :-1, :], code, code_mask, latent_sketch, sketch_mask_p)
+            sketch_logits, type_logits = sketch_dec(pixel[:, :-1], coord[:, :-1, :], code, code_mask, latent_sketch, sketch_mask_p)
 
             # Pass through code decoder
-            code_logits, type_logits = code_dec(code[:, :-1], latent_sketch, sketch_mask_p)
+            code_logits = code_dec(code[:, :-1], latent_sketch, sketch_mask_p)
 
             valid_mask = (~sketch_mask).reshape(-1)
             sketch_pred = sketch_logits.reshape(-1, sketch_logits.shape[-1])
@@ -180,9 +179,9 @@ def train(args):
             code_gt = code.reshape(-1)
             code_loss = F.cross_entropy(code_pred[valid_mask], code_gt[valid_mask])
 
-            valid_mask = (~types_mask).reshape(-1)
+            valid_mask = (~sketch_mask).reshape(-1)
             type_pred = type_logits.reshape(-1, type_logits.shape[-1])
-            type_gt = types.reshape(-1)
+            type_gt = coord[:, :, 2].reshape(-1)
             type_loss = F.cross_entropy(type_pred[valid_mask], type_gt[valid_mask])
 
             total_loss = sketch_loss + code_loss + type_loss
@@ -228,11 +227,11 @@ def train(args):
         # writer.add_scalar("acc/Train_outside_area", total_outside_area_acc, epoch)
         progress_bar.close()
 
-        val_loss = evaluate(valdataloader, sketch_enc, sketch_dec, code_dec)
-        test_loss = evaluate(testdataloader, sketch_enc, sketch_dec, code_dec)
-        writer.add_scalar("Loss/Val", val_loss, epoch)
-        writer.add_scalar("Loss/Test", test_loss, epoch)
-        print(f"Epoch {epoch}: Val_Loss = {val_loss:.4f}, Test_Loss = {test_loss:.4f}")
+        # val_loss = evaluate(valdataloader, sketch_enc, sketch_dec, code_dec)
+        # test_loss = evaluate(testdataloader, sketch_enc, sketch_dec, code_dec)
+        # writer.add_scalar("Loss/Val", val_loss, epoch)
+        # writer.add_scalar("Loss/Test", test_loss, epoch)
+        # print(f"Epoch {epoch}: Val_Loss = {val_loss:.4f}, Test_Loss = {test_loss:.4f}")
         writer.flush()
 
         # # save model after n epoch

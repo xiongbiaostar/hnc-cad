@@ -11,16 +11,16 @@ from config import *
 from hashlib import sha256
 import numpy as np
 from dataset import CADData
-from utils import CADparser, write_obj_sample
-from model.encoder import SketchEncoder, ExtEncoder
-from model.decoder import SketchDecoder, ExtDecoder, CodeDecoder
+from utils import CADparser
+from model.encoder import SketchEncoder
+from model.decoder import SketchDecoder, CodeDecoder
 from shapely.geometry import Polygon
 from cleanfid import fid
 import cv2
 
 IMAGE_SIZE = 128
-real_dir = "real_images_aug_tenres"
-fake_dir = "fake_images_aug_tenres"
+real_dir = "real_images_aug_fivres-0.1-0.9-4000"
+fake_dir = "fake_images_aug_fivres-0.1-0.9-4000"
 os.makedirs(real_dir, exist_ok=True)
 os.makedirs(fake_dir, exist_ok=True)
 
@@ -102,13 +102,13 @@ def coord2param(coord_full, type_full, SKETCH_PAD):
         param.append(coord_full[i])
     return params
 
-def draw_polygon(ax, points_list, colors=['#FFFFFF', '#F4F2E5', '#FDF4AB', '#EAD8D6', '#CDE9FC', '#D0D887', '#F9DEBD']):
+def draw_polygon(ax, points_list, colors):
     for index, points in enumerate(points_list):
         room_points = points[1:]
         color = colors[points[0][0]]
 
         # 将多边形点添加到 Patch
-        polygon = MatplotlibPolygon(room_points, closed=True, facecolor=color, alpha=1.0, edgecolor=color)
+        polygon = MatplotlibPolygon(room_points, closed=True, facecolor=color, alpha=0.3, edgecolor=color)
         ax.add_patch(polygon)
 
         for j in range(len(room_points)):
@@ -119,7 +119,7 @@ def draw_polygon(ax, points_list, colors=['#FFFFFF', '#F4F2E5', '#FDF4AB', '#EAD
     ax.set_xlabel("X coordinate")
     ax.set_ylabel("Y coordinate")
 
-def draw_polygon_GT_image(points_list, save_folder, colors=['#FFFFFF', '#F4F2E5', '#FDF4AB', '#EAD8D6', '#CDE9FC', '#D0D887', '#F9DEBD']):
+def draw_polygon_GT_image(points_list, save_folder, colors=['b', 'g', 'r', 'c', 'm', 'y', 'k']):
     # 创建一个新的图和轴
     fig, ax = plt.subplots()
 
@@ -128,7 +128,7 @@ def draw_polygon_GT_image(points_list, save_folder, colors=['#FFFFFF', '#F4F2E5'
         color = colors[points[0][0]-1]
 
         # 将多边形点添加到 Patch
-        polygon = MatplotlibPolygon(room_points, closed=True, facecolor=color, alpha=1.0, edgecolor='none')
+        polygon = MatplotlibPolygon(room_points, closed=True, facecolor=color, alpha=0.3, edgecolor=color)
         ax.add_patch(polygon)
 
         for j in range(len(room_points)):
@@ -145,14 +145,14 @@ def draw_polygon_GT_image(points_list, save_folder, colors=['#FFFFFF', '#F4F2E5'
     plt.close()
 
 
-def draw_polygon_image( points_list, save_folder,colors=['#FFFFFF', '#F4F2E5', '#FDF4AB', '#EAD8D6', '#CDE9FC', '#D0D887', '#F9DEBD']):
+def draw_polygon_image( points_list, save_folder,colors=['b', 'g', 'r', 'c', 'm', 'y', 'k']):
     fig, ax = plt.subplots()
     for index, points in enumerate(points_list):
         room_points = points[1:]
         color = colors[points[0][0]]
 
         # 将多边形点添加到 Patch
-        polygon = MatplotlibPolygon(room_points, closed=True, facecolor=color, alpha=1.0, edgecolor=color)
+        polygon = MatplotlibPolygon(room_points, closed=True, facecolor=color, alpha=0.3, edgecolor=color)
         ax.add_patch(polygon)
 
         for j in range(len(room_points)):
@@ -165,13 +165,13 @@ def draw_polygon_image( points_list, save_folder,colors=['#FFFFFF', '#F4F2E5', '
     plt.savefig(save_folder)
     plt.close()
 
-def draw_polygon_GT(ax, points_list, colors=['#FFFFFF', '#F4F2E5', '#FDF4AB', '#EAD8D6', '#CDE9FC', '#D0D887', '#F9DEBD']):
+def draw_polygon_GT(ax, points_list, colors):
     for index, points in enumerate(points_list):
         room_points = points[1:]
         color = colors[points[0][0] - 1]
 
         # 将多边形点添加到 Patch
-        polygon = MatplotlibPolygon(room_points, closed=True, facecolor=color, alpha=1.0, edgecolor=color)
+        polygon = MatplotlibPolygon(room_points, closed=True, facecolor=color, alpha=0.3, edgecolor=color)
         ax.add_patch(polygon)
 
         for j in range(len(room_points)):
@@ -182,7 +182,7 @@ def draw_polygon_GT(ax, points_list, colors=['#FFFFFF', '#F4F2E5', '#FDF4AB', '#
     ax.set_xlabel("X coordinate")
     ax.set_ylabel("Y coordinate")
 
-def plot(boundaries, param_ori, param_pred_sel1, param_pred_sel2, save_folder, name, colors=['#FFFFFF', '#F4F2E5', '#FDF4AB', '#EAD8D6', '#CDE9FC', '#D0D887', '#F9DEBD']):
+def plot(boundaries, param_ori, param_pred_sel1, param_pred_sel2, save_folder, name, colors=['b', 'g', 'r', 'c', 'm', 'y', 'k']):
     fig, axs = plt.subplots(2, 2, figsize=(12, 12))
 
     draw_polygon_GT(axs[0, 0], boundaries, colors)
@@ -195,7 +195,7 @@ def plot(boundaries, param_ori, param_pred_sel1, param_pred_sel2, save_folder, n
     axs[1, 0].set_title('Predict 1')
     axs[1, 1].set_title('Predict 2')
 
-    color_dict = {'#ffffff': 'exterior wall', '#f4f1d0': 'living room', '#f8e98e': 'bedroom', '#eadbd7': 'kitchen', '#cde3f6': 'bathroom', '#c8d7a4': 'balcony', '#f5d8af': 'Storage'}
+    color_dict = {'b': 'exterior wall', 'g': 'living room', 'r': 'bedroom', 'c': 'kitchen', 'm': 'bathroom', 'y': 'balcony', 'k': 'Storage'}
     for color, label in color_dict.items():
         axs[0, 1].scatter([], [], c=color, label=label)
     axs[0, 1].legend(loc='upper right', bbox_to_anchor=(1.05, 1), title="Legend")
@@ -357,19 +357,19 @@ def sample(args):
 
     # Load model weights
     sketch_enc = SketchEncoder()
-    sketch_enc.load_state_dict(torch.load(os.path.join(args.weight, 'sketch_enc_epoch_1000.pt')))
+    sketch_enc.load_state_dict(torch.load(os.path.join(args.weight, 'sketch_enc_epoch_250.pt')))
     sketch_enc.cuda().eval()
 
     sketch_dec = SketchDecoder(args.mode, num_code=code_size)
-    sketch_dec.load_state_dict(torch.load(os.path.join(args.weight, 'sketch_dec_epoch_1000.pt')))
+    sketch_dec.load_state_dict(torch.load(os.path.join(args.weight, 'sketch_dec_epoch_250.pt')))
     sketch_dec.cuda().eval()
 
     code_dec = CodeDecoder(args.mode, code_size)
-    code_dec.load_state_dict(torch.load(os.path.join(args.weight, 'code_dec_epoch_1000.pt')))
+    code_dec.load_state_dict(torch.load(os.path.join(args.weight, 'code_dec_epoch_250.pt')))
     code_dec.cuda().eval()
 
     # Random sampling
-    code_bsz = 10  # every partial input samples this many neural codes
+    code_bsz = 1  # every partial input samples this many neural codes
     count = 0
     coverage_sel_all = 0
     total_overlap_area_sel_all = 0
@@ -383,8 +383,9 @@ def sample(args):
     gt_Svec = np.zeros(8)
 
     boundary_data = []
-    for pixel_p, coord_p, sketch_mask_p, _, _, _, _, _, _, _, name, boundaries in dataloader:
-        #if count > 400: break  # only visualize the first 50 examples
+    from tqdm import tqdm
+    for pixel_p, coord_p, sketch_mask_p, _, _, _, _, _, _, _, name, boundaries in tqdm(dataloader, desc="Processing"):
+        if count > 5000: break  # only visualize the first 50 examples
         try:
             pixel_p = pixel_p.cuda()
             coord_p = coord_p.cuda()
@@ -431,90 +432,84 @@ def sample(args):
             sketch_latent = sketch_latent.repeat(len(total_code), 1, 1)
             sketch_mask_p = sketch_mask_p.repeat(len(total_code), 1)
             xy_samples,  _code_, _code_mask_, _latent_z_, _latent_mask_ = sketch_dec.sample(total_code, total_code_mask,pixel_p, coord_p,  sketch_latent, sketch_mask_p,top_k=1, top_p=0)
-            if len(xy_samples) >= 10:
-                param_pred_sel = [
-                    coord2param(xy_samples[0], type_unique[0], SKETCH_PAD),
-                    coord2param(xy_samples[1], type_unique[1], SKETCH_PAD),
-                    coord2param(xy_samples[2], type_unique[2], SKETCH_PAD),
-                    # coord2param(xy_samples[3], type_unique[3], SKETCH_PAD),
-                    # coord2param(xy_samples[4], type_unique[4], SKETCH_PAD),
-                    # coord2param(xy_samples[5], type_unique[5], SKETCH_PAD),
-                    # coord2param(xy_samples[6], type_unique[6], SKETCH_PAD),
-                    # coord2param(xy_samples[7], type_unique[7], SKETCH_PAD),
-                    # coord2param(xy_samples[8], type_unique[8], SKETCH_PAD),
-                    # coord2param(xy_samples[9], type_unique[9], SKETCH_PAD),
-                ]
-            else:
-                continue
+            # if len(xy_samples) >= 5:
+            # param_pred_sel = [
+            #     coord2param(xy_samples[0], type_unique[0], SKETCH_PAD),
+            # ]
+            # else:
+            #     continue
+            param_pred_sel = []
+            for i in range(len(xy_samples)):
+                param_pred_sel.append(coord2param(xy_samples[i], type_unique[i], SKETCH_PAD))
                 #param_pred_sel1 = param_pred_sel2 = coord2param(xy_samples[0], type_unique[0], SKETCH_PAD)
-            #GT_boundaries = [tensor.squeeze(0).numpy().tolist() for tensor in boundaries]
-            #coord_ori = coord_p.cpu().numpy()[0]
+            GT_boundaries = [tensor.squeeze(0).numpy().tolist() for tensor in boundaries]
+            coord_ori = coord_p.cpu().numpy()[0]
 
-            #param_ori = coord2param(coord_ori, np.array([1]), SKETCH_PAD)
+            param_ori = coord2param(coord_ori, np.array([1]), SKETCH_PAD)
             #plot(GT_boundaries, param_ori, param_pred_sel1, param_pred_sel2, result_folder, name)
             #
-            # draw_polygon_GT_image(GT_boundaries, os.path.join(real_dir, f"{int(name[0])}_gt.png"))
-            # _, _, _, Tvec, Avec, Svec = calculate_coverage_and_statistics(GT_boundaries, room_type_num=8)
-            # gt_Tvec += Tvec
-            # gt_Avec += Avec
-            # gt_Svec += Svec
+            draw_polygon_GT_image(GT_boundaries, os.path.join(real_dir, f"{int(name[0])}_gt.png"))
+            _, _, _, Tvec, Avec, Svec = calculate_coverage_and_statistics(GT_boundaries, room_type_num=8)
+            gt_Tvec += Tvec
+            gt_Avec += Avec
+            gt_Svec += Svec
 
             for i, pred in enumerate(param_pred_sel):
                 global cover_count, cover_allcount
                 try:
-                    #draw_polygon_image(pred, os.path.join(fake_dir, f"{int(name[0])}_pred{i}.png"))
-                    # coverage_sel, total_overlap_area_sel, total_outside_area_sel, Tvec, Avec, Svec = calculate_coverage_and_statistics(pred, room_type_num=8)
-                    # if coverage_sel == 1 and total_overlap_area_sel == 0 and total_outside_area_sel == 0:
-                    #     cover_count += 1
+                    draw_polygon_image(pred, os.path.join(fake_dir, f"{int(name[0])}_pred{i}.png"))
+                    coverage_sel, total_overlap_area_sel, total_outside_area_sel, Tvec, Avec, Svec = calculate_coverage_and_statistics(pred, room_type_num=8)
+                    if coverage_sel == 1 and total_overlap_area_sel == 0 and total_outside_area_sel == 0:
+                        cover_count += 1
 
-                    boundary_data.append({'uid': f'{int(name[0])}', 'param': pred})
-                    #
-                    # pred_Tvec += Tvec
-                    # pred_Avec += Avec
-                    # pred_Svec += Svec
-                    # coverage_sel_all += abs(1 - coverage_sel)
-                    # total_overlap_area_sel_all += total_overlap_area_sel
-                    # total_outside_area_sel_all += total_outside_area_sel
-                    # cover_allcount += 1
+                    #boundary_data.append({'uid': f'{int(name[0])}', 'param': pred})
+
+                    pred_Tvec += Tvec
+                    pred_Avec += Avec
+                    pred_Svec += Svec
+                    coverage_sel_all += abs(1 - coverage_sel)
+                    total_overlap_area_sel_all += total_overlap_area_sel
+                    total_outside_area_sel_all += total_outside_area_sel
+                    cover_allcount += 1
                 except Exception as e:
                     print(e)
 
 
 
             count += 1
-            # print("------------------------------")
-            # print("count = ", count)
-            # print("cover_count =", cover_count)
-            # print("cover_allcount = ", cover_allcount)
-            # print("rating =", cover_count/cover_allcount)
-            # print("coverage =" , coverage_sel_all/cover_allcount)
-            # print("overlap_rating = ", total_overlap_area_sel_all/cover_allcount)
-            # print("outside_rating = ", total_outside_area_sel_all/cover_allcount)
-            # pred_Tvec_avg = pred_Tvec / (count * 10)
-            # gt_Tvec_avg = gt_Tvec / count
-            #
-            # pred_Avec_avg = pred_Avec / (count * 10)
-            # gt_Avec_avg = gt_Avec / count
-            #
-            # pred_Svec_avg = pred_Svec / (count * 10)
-            # gt_Svec_avg = gt_Svec / count
-            #
-            # mse_T = np.mean((pred_Tvec_avg - gt_Tvec_avg) ** 2)
-            # mse_A = np.mean((pred_Avec_avg - gt_Avec_avg) ** 2)
-            # mse_S = np.mean(((pred_Svec_avg - gt_Svec_avg)*(20/256)**2) ** 2)
-            #
-            # print(f"mse_T: {mse_T:.5f}")
-            # print(f"mse_A: {mse_A:.3f}")
-            # print(f"mse_S: {mse_S:.3f}")
+            print("------------------------------")
+            print("count = ", count)
+            print("cover_count =", cover_count)
+            print("cover_allcount = ", cover_allcount)
+            print("rating =", cover_count/cover_allcount)
+            print("coverage =" , coverage_sel_all/cover_allcount)
+            print("overlap_rating = ", total_overlap_area_sel_all/cover_allcount)
+            print("outside_rating = ", total_outside_area_sel_all/cover_allcount)
+            pred_Tvec_avg = pred_Tvec / (count * 10)
+            gt_Tvec_avg = gt_Tvec / count
+
+            pred_Avec_avg = pred_Avec / (count * 10)
+            gt_Avec_avg = gt_Avec / count
+
+            pred_Svec_avg = pred_Svec / (count * 10)
+            gt_Svec_avg = gt_Svec / count
+
+            mse_T = np.mean((pred_Tvec_avg - gt_Tvec_avg) ** 2)
+            mse_A = np.mean((pred_Avec_avg - gt_Avec_avg) ** 2)
+            mse_S = np.mean(((pred_Svec_avg - gt_Svec_avg)*(20/256)**2) ** 2)
+
+            print(f"mse_T: {mse_T:.5f}")
+            print(f"mse_A: {mse_A:.3f}")
+            print(f"mse_S: {mse_S:.3f}")
         except Exception as e:
             print(e)
 
 
-    with open('boundary.pkl', 'wb') as file:
-        pickle.dump(boundary_data, file)
+    # with open('boundary.pkl', 'wb') as file:
+    #     pickle.dump(boundary_data, file)
 
-    # fid_score = fid.compute_fid("real_images_aug_tenres", "fake_images_aug_tenres")
-    # print("FID Score:", fid_score)
+    fid_score = fid.compute_fid("real_images_aug_fivres-0-1-4000", "fake_images_aug_fivres-0-1-4000")
+    print("FID Score:", fid_score)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

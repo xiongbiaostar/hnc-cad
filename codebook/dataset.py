@@ -307,14 +307,13 @@ class LoopData(torch.utils.data.Dataset):
         for data in dataset:
             param_full = data['param']
             tokens = []
-            tokens.append(param_full[0] - LOOP_PARAM_PAD)
+            type = param_full[0][0] - LOOP_PARAM_PAD
             for pp in param_full[1:]:
-                tokens.append(pp)
-            # EOS
+                tokens.append( np.insert(pp, 2, type))
 
-            tokens.append(np.array([-1, -1]))
-            tokens = np.vstack(tokens)
-            tokens = tokens + LOOP_PARAM_PAD
+            # EOS
+            tokens.append(np.array([-1, -1, -1]))
+            tokens = np.vstack(tokens)+ LOOP_PARAM_PAD
 
             if len(tokens) > MAX_LOOP:
                 continue
@@ -339,7 +338,7 @@ class LoopData(torch.utils.data.Dataset):
         keys = np.ones(len(tokens))
         padding = np.zeros(MAX_LOOP - len(tokens)).astype(int)
         seq_mask = 1 - np.concatenate([keys, padding]) == 1
-        padding = np.zeros((MAX_LOOP - len(tokens), 2)).astype(int)
+        padding = np.zeros((MAX_LOOP - len(tokens), 3)).astype(int)
         tokens = np.concatenate([tokens, padding], axis=0)
         return tokens, seq_mask
 

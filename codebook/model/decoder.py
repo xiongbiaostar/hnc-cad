@@ -151,9 +151,9 @@ class LoopDecoder(nn.Module):
     def forward(self, coord, seq_mask, ignore_mask, latent_code):
         """ forward pass """
         bs = len(coord)
-        p_embed = self.param_embed(coord[:, 1:, :])
-        type_embeddings = self.type_embed(coord[:, 0:1, :])
-        p_embeds = torch.cat((type_embeddings, p_embed), dim=1)
+        p_embed = self.param_embed(coord[:, :, :2])
+        type_embeddings = self.type_embed(coord[:, :, 2]).view(coord.shape[0], coord.shape[1], 1, -1)
+        p_embeds = torch.cat((p_embed, type_embeddings), dim=2)
         p_embeds[ignore_mask] = self.mask_token
         p_embeds = p_embeds.flatten(start_dim=2, end_dim=3)
         p_embeds = self.param_fc(p_embeds.flatten(0, 1)).unflatten(0, (p_embeds.shape[0], p_embeds.shape[1]))
@@ -166,8 +166,8 @@ class LoopDecoder(nn.Module):
 
         param_logits1 = self.param_logit1(decoder_out)
         param_logits1 = param_logits1.view(param_logits1.shape[0], param_logits1.shape[1], LOOP_PARAM_SEQ, -1)
-        bbox_features = param_logits1[:, 1:, :, :]
-        room_type_features = param_logits1[:, 0:1, :, :]
+        bbox_features = param_logits1[:, :, :2, :]
+        room_type_features = param_logits1[:, :, 2, :]
 
         bbox_logits = self.bbox_logit(bbox_features)
 

@@ -202,9 +202,9 @@ class LoopEncoder(nn.Module):
 
   def forward(self, coord, seq_mask):
     """ forward pass """
-    p_embed = self.param_embed(coord[:, 1:, :])
-    type_embeddings = self.type_embed(coord[:, 0:1, :])
-    combined_features = torch.cat((type_embeddings, p_embed), dim=1).flatten(start_dim=2, end_dim=3)
+    p_embed = self.param_embed(coord[:, :, :2])
+    type_embeddings = self.type_embed(coord[:, :, 2]).view(coord.shape[0], coord.shape[1], 1, -1)
+    combined_features = torch.cat((p_embed, type_embeddings), dim=2).flatten(start_dim=2, end_dim=3)
     p_embeds = self.param_fc(combined_features.flatten(0, 1)).unflatten(0, (combined_features.shape[0], combined_features.shape[1]))
     encoder_input = self.pos_embed(p_embeds.transpose(0, 1))
 

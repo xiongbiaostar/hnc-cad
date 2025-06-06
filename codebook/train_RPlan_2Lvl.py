@@ -202,14 +202,14 @@ def train(args):
                                             mask=ignore_mask[:, :, 0:1])
             else:
                 param_loss = squared_emd_loss(logits=param_logits,
-                                              labels=param[:, 1:, :],
+                                              labels=param[:, :, :2],
                                               num_classes=param_logits.shape[-1],
-                                              mask=ignore_mask[:, 1:, :])
+                                              mask=ignore_mask[:, :, :2])
 
                 type_loss = squared_emd_loss(logits=type_logits,
-                                             labels=param[:, 0:1, :],
+                                             labels=param[:, :, 2],
                                              num_classes=type_logits.shape[-1],
-                                             mask=ignore_mask[:, 0:1, :])
+                                             mask=ignore_mask[:, :, 2])
 
 
             total_loss = param_loss + vq_loss + type_loss

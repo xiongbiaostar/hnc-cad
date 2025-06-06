@@ -146,7 +146,6 @@ class CADData(torch.utils.data.Dataset):
             pixels, sketch_mask = self.pad_pixel(pixel_full)
             coords = self.pad_coord(coord_full)
             total_code, code_mask = self.pad_code(total_code)
-            total_types, types_mask = self.pad_type(types)
 
             vec_data = {}
             vec_data['pixel'] = pixels
@@ -155,8 +154,6 @@ class CADData(torch.utils.data.Dataset):
             vec_data['code'] = total_code
             vec_data['code_mask'] = code_mask
             vec_data['param'] = boundaries
-            vec_data['types'] = total_types
-            vec_data['types_mask'] = types_mask
             vec_data['name'] = profile_uid
 
             self.data.append(vec_data)
@@ -169,13 +166,13 @@ class CADData(torch.utils.data.Dataset):
             # Sketch
             coords = []
             pixels = []
-
+            type = boundary[0][0] - 1
             for param in boundary[1:]:
-                coords.append(param)
+                coords.append(np.insert(param, 2 , type))
 
-            coords.append(np.array([-1, -1]))
+            coords.append(np.array([-1, -1, -1]))
 
-            for xy in coords:
+            for xy in coords[:]:
                 if xy[0] < 0:
                     pixels.append(xy[0])
                 else:
@@ -184,7 +181,7 @@ class CADData(torch.utils.data.Dataset):
             pixel_full.append(pixels)
             coord_full.append(coords)
 
-        coord_full.append(np.array([-2, -2]))  # profile结束标志
+        coord_full.append(np.array([-2, -2, -2]))  # profile结束标志
         pixel_full += [-2]
 
         coord_full = np.vstack(coord_full) + SKETCH_PAD
@@ -200,13 +197,13 @@ class CADData(torch.utils.data.Dataset):
             # Sketch
             coords = []
             pixels = []
-
+            type = boundary[0][0] - 1
             for param in boundary[1:]:
-                coords.append(param)
+                coords.append(np.insert(param, 2 , type))
 
-            coords.append(np.array([-1, -1]))
+            coords.append(np.array([-1, -1, -1]))
 
-            for xy in coords:
+            for xy in coords[:]:
                 if xy[0] < 0:
                     pixels.append(xy[0])
                 else:
@@ -215,7 +212,7 @@ class CADData(torch.utils.data.Dataset):
             pixel_full.append(pixels)
             coord_full.append(coords)
 
-        coord_full.append(np.array([-2, -2]))  # profile结束标志
+        coord_full.append(np.array([-2, -2, -2]))  # profile结束标志
         pixel_full += [-2]
 
         coord_full = np.vstack(coord_full) + SKETCH_PAD
@@ -231,7 +228,7 @@ class CADData(torch.utils.data.Dataset):
         return tokens, seq_mask
 
     def pad_coord(self, tokens):
-        padding = np.zeros((MAX_CAD - len(tokens), 2)).astype(int)
+        padding = np.zeros((MAX_CAD - len(tokens), 3)).astype(int)
         tokens = np.concatenate([tokens, padding], axis=0)
         return tokens
 
@@ -265,8 +262,6 @@ class CADData(torch.utils.data.Dataset):
         code = vec_data['code']
         code_mask = vec_data['code_mask']
         param = vec_data['param']
-        types = vec_data['types']
-        types_mask = vec_data['types_mask']
 
         # if self.ori_param is False:
         #     # Random masking
@@ -287,9 +282,9 @@ class CADData(torch.utils.data.Dataset):
         pixels = vec_data['pixel']
         coords = vec_data['coord']
         if self.ori_param:
-            return pixels_par, coords_par, sketch_mask_par, pixels, coords,  sketch_mask, code, code_mask, types, types_mask, vec_data['name'], vec_data['param']
+            return pixels_par, coords_par, sketch_mask_par, pixels, coords,  sketch_mask, code, code_mask, vec_data['name'], vec_data['param']
         else:
-            return pixels_par, coords_par,  sketch_mask_par, pixels, coords,  sketch_mask, code, code_mask, types, types_mask, vec_data['name']
+            return pixels_par, coords_par,  sketch_mask_par, pixels, coords,  sketch_mask, code, code_mask, vec_data['name']
 
 
 

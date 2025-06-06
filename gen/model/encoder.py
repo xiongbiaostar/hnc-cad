@@ -16,6 +16,7 @@ class SketchEncoder(nn.Module):
     self.embed_dim = ENCODER_CONFIG['embed_dim']
     self.coord_embed_x = Embedder(2**CAD_BIT+SKETCH_PAD, self.embed_dim)
     self.coord_embed_y = Embedder(2**CAD_BIT+SKETCH_PAD, self.embed_dim)
+    self.type_embed = Embedder(TYPE_NUM + SKETCH_PAD, self.embed_dim)
     self.pixel_embeds = Embedder(2**CAD_BIT * 2**CAD_BIT+SKETCH_PAD, self.embed_dim)
     self.pos_embed = PositionalEncoding(max_len=MAX_CAD, d_model=self.embed_dim)
     layers = TransformerEncoderLayerImproved(d_model=self.embed_dim, nhead=ENCODER_CONFIG['num_heads'], 
@@ -26,8 +27,9 @@ class SketchEncoder(nn.Module):
   def forward(self, pixel, coord, mask):
     """ forward pass """
     coord_embed = self.coord_embed_x(coord[...,0]) + self.coord_embed_y(coord[...,1]) # [bs, vlen, dim]
+    type_embed = self.type_embed(coord[...,2])
     pixel_embed = self.pixel_embeds(pixel)
-    embed_inputs = pixel_embed + coord_embed 
+    embed_inputs = pixel_embed + coord_embed + type_embed
     input_embeds = self.pos_embed(embed_inputs.transpose(0,1))
     outputs = self.encoder(src=input_embeds, src_key_padding_mask=mask)  # [seq_len, bs, dim]    
     return outputs.transpose(0,1)
