@@ -92,7 +92,6 @@ class SketchDecoder(nn.Module):
 
         pix_samples = []
         xy_samples = []
-        type_samples = []
         latent_samples = []
         code_samples = []
         latent_mask_samples = []
@@ -109,7 +108,6 @@ class SketchDecoder(nn.Module):
 
                     pixel_seq = pixel_p_nonzero.repeat(n_samples, 1)
                     xy_seq = coord_p_nonzero.repeat(n_samples, 1, 1)
-                    ty_seq = coord_p_nonzero.repeat(n_samples, 1)
                 else:
                     pixel_seq = [None] * n_samples
                     xy_seq = [None] * n_samples
@@ -127,37 +125,35 @@ class SketchDecoder(nn.Module):
 
             next_types = []
             for logit in t_logits:
-                filtered_logits = top_k_top_p_filteriing(logit, top_k=top_k, top_p=top_p)
+                filtered_logits = top_k_top_p_filtering(logit, top_k=top_k, top_p=top_p)
                 next_type = torch.multinomial(F.softmax(filtered_logits, dim=-1), 1)
                 next_types.append(next_type.item())
 
 
             # Convert pixel index to xy coordinate
             next_xys = []
-            for pixel in next_pixels:
+            for i, pixel in enumerate(next_pixels):
                 if pixel >= SKETCH_PAD:
                     xy = pixel2xy[pixel - SKETCH_PAD]
                 else:
                     xy = np.array([pixel, pixel]).astype(int)
-                next_xys.append(xy)
+                next_type = next_types[i] # 取出对应的标量值
+                combined = np.hstack([xy, next_type])  # 拼接成 [x, y, type]
+                next_xys.append(combined)
             next_xys = np.vstack(next_xys)  # [BS, 2]
             next_pixels = np.vstack(next_pixels)  # [BS, 1]
-            next_types = np.vstack(next_types)
 
 
             # Add next tokens
             nextp_seq = torch.LongTensor(next_pixels).view(len(next_pixels), 1).cuda()
             nextxy_seq = torch.LongTensor(next_xys).unsqueeze(1).cuda()
-            nexttype_seq = torch.LongTensor(next_types).unsqueeze(1).cuda()
 
             if xy_seq[0] is None:
                 pixel_seq = nextp_seq
                 xy_seq = nextxy_seq
-                type_seq = nexttype_seq
             else:
                 pixel_seq = torch.cat([pixel_seq, nextp_seq], 1)
                 xy_seq = torch.cat([xy_seq, nextxy_seq], 1)
-                type_seq = torch.cat([type_seq, nexttype_seq], 1)
 
             # Early stopping
             done_idx = np.where(next_pixels == 0)[0]
@@ -165,16 +161,14 @@ class SketchDecoder(nn.Module):
             if len(done_idx) > 0:
                 done_pixs = pixel_seq[done_idx]
                 done_xys = xy_seq[done_idx]
-                done_type = type_seq[done_idx]
                 done_code = code[done_idx]
                 done_code_mask = code_mask[done_idx]
 
-                for pix, xy, type, _code_, _code_mask_ in zip(done_pixs, done_xys, done_type, done_code, done_code_mask):
+                for pix, xy,  _code_, _code_mask_ in zip(done_pixs, done_xys, done_code, done_code_mask):
                     pix = pix.detach().cpu().numpy()
                     xy = xy.detach().cpu().numpy()
                     pix_samples.append(pix)
                     xy_samples.append(xy)
-                    type_samples.append(type)
                     code_samples.append(_code_)
                     code_mask_samples.append(_code_mask_)
 
@@ -202,7 +196,7 @@ class SketchDecoder(nn.Module):
             latent_mask_samples = torch.stack(latent_mask_samples)
         code_samples = torch.stack(code_samples)
         code_mask_samples = torch.stack(code_mask_samples)
-        return xy_samples, code_samples, type_samples, code_mask_samples, latent_samples, latent_mask_samples
+        return xy_samples, code_samples, code_mask_samples, latent_samples, latent_mask_samples
 
 class CodeDecoder(nn.Module):
 
@@ -272,11 +266,10 @@ class CodeDecoder(nn.Module):
         for k in range(MAX_CODE):
             if k == 0:
                 v_seq = [None] * n_samples
-                v_type = [None] * n_samples
 
             # pass through decoder
             with torch.no_grad():
-                logits, type_logits = self.forward(code=v_seq, latent_z=latent_z, latent_mask=latent_mask)
+                logits = self.forward(code=v_seq, latent_z=latent_z, latent_mask=latent_mask)
                 logits = logits[:, -1, :]
 
                 # Top-p sampling
